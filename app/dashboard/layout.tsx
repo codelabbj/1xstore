@@ -18,6 +18,7 @@ import { LogOut, User, Loader2, Bell, Gift } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import Image from "next/image"
 import { settingsApi } from "@/lib/api-client"
+import { Footer } from "@/components/footer"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -60,7 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const userInitials = `${user.first_name?.[0] || ""}${user.last_name?.[0] || ""}`.toUpperCase()
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/90">
         <div className="container mx-auto px-3 sm:px-4 lg:px-6">
@@ -163,7 +164,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </header>
 
       {/* Main content */}
-      <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">{children}</main>
+      <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1">{children}</main>
     </div>
   )
 }

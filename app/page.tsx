@@ -21,7 +21,7 @@ export default function HomePage() {
   }, [user, isLoading, router])
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-6">
+    <div className="flex-1 flex flex-col items-center justify-center gap-6">
       <Image
         src="/Africash-logo.png"
         alt="Africash Logo"

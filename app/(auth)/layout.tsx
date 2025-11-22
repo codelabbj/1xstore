@@ -1,5 +1,6 @@
 import type React from "react"
 import Image from "next/image"
+import { Footer } from "@/components/footer"
 
 export default function AuthLayout({
   children,
@@ -18,7 +19,7 @@ export default function AuthLayout({
           priority
         />
       </div>
-      <div className="w-full max-w-md">{children}</div>
+      <div className="w-full max-w-md flex-1 flex items-center">{children}</div>
     </div>
   )
 }
