@@ -273,7 +273,8 @@ export default function DashboardPage() {
                     variant="outline"
                     className="w-full h-11 sm:h-12 text-sm sm:text-base font-medium flex items-center justify-center gap-2 border-2 hover:bg-primary hover:text-primary-foreground transition-all"
                   >
-                    <a href="/app-v1.0.5.apk" download="Africash-v1.0.5.apk" className="flex items-center gap-2">
+                    {/* <a href="/app-v1.0.5.apk" download="Africash-v1.0.5.apk" className="flex items-center gap-2"> */}
+                    <a href="" download="" className="flex items-center gap-2">
                       <Download className="h-4 w-4 sm:h-5 sm:w-5" />
                       <span className="hidden sm:inline">Télécharger l'application mobile</span>
                       <span className="sm:hidden">Télécharger l'app</span>
