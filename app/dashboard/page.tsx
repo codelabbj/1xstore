@@ -289,8 +289,8 @@ export default function DashboardPage() {
 
       {/* Download App */}
       <a
-        href="/app-v1.0.5.apk"
-        download="1xstore-v1.0.5.apk"
+        href="/app-v1.0.1.apk"
+        download="1xstore-v1.0.1.apk"
         className="bg-slate-800/80 dark:bg-slate-800/50 rounded-xl p-3 flex items-center gap-3 hover:bg-slate-700/80 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
       >
         <div className="w-8 h-8 rounded-lg bg-[#3FA9FF]/20 flex items-center justify-center flex-shrink-0">
