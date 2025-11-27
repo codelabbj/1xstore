@@ -2,10 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Bell, Check, RefreshCw, Loader2, ArrowLeft, MessageSquare } from 'lucide-react';
+import { Bell, Check, RefreshCw, Loader2, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
 import { notificationApi } from '@/lib/api-client';
 import { Notification } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
@@ -14,9 +11,8 @@ import { toast } from 'react-hot-toast';
 import { fcmService } from '@/lib/firebase';
 import type { MessagePayload } from 'firebase/messaging';
 
-// Extended notification type to include FCM notifications
 interface FCMNotification {
-  id: string; // Use timestamp + random for unique ID
+  id: string;
   title: string;
   content: string;
   created_at: string;
@@ -43,344 +39,213 @@ export default function NotificationsPage() {
       setIsLoading(pageNum === 1);
       
       const response = await notificationApi.getAll(pageNum);
-      
       setNotifications(response.results);
       setHasNext(!!response.next);
       setHasPrevious(!!response.previous);
       setPage(pageNum);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
-      toast.error('Échec du chargement des notifications');
+      toast.error('Échec du chargement');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  useEffect(() => { fetchNotifications(); }, []);
 
-  // Refetch data when the page gains focus to ensure fresh data
   useEffect(() => {
-    const handleFocus = () => {
-      fetchNotifications(page);
-    };
+    const handleFocus = () => fetchNotifications(page);
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [page]);
 
-  // Load FCM notifications from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedFcmNotifications = localStorage.getItem('fcm_notifications');
       if (storedFcmNotifications) {
         try {
-          const parsed = JSON.parse(storedFcmNotifications);
-          setFcmNotifications(parsed);
+          setFcmNotifications(JSON.parse(storedFcmNotifications));
         } catch (error) {
-          console.error('Error loading FCM notifications from storage:', error);
+          console.error('Error loading FCM notifications:', error);
         }
       }
     }
   }, []);
 
-  // Setup FCM foreground message listener
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleFCMMessage = (payload: MessagePayload) => {
-      console.log('FCM notification received in notifications page:', payload);
-      
       const fcmNotification: FCMNotification = {
         id: `fcm-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
         title: payload.notification?.title || 'Nouvelle notification',
-        content: payload.notification?.body || payload.data?.body || 'Vous avez une nouvelle notification',
+        content: payload.notification?.body || payload.data?.body || '',
         created_at: new Date().toISOString(),
         is_read: false,
         is_fcm: true,
-        payload: payload,
+        payload,
       };
 
-      // Add to state
       setFcmNotifications(prev => {
         const updated = [fcmNotification, ...prev];
-        // Save to localStorage with the updated state
         localStorage.setItem('fcm_notifications', JSON.stringify(updated));
         return updated;
       });
-
-      // Show native browser notification
-      try {
-        if (typeof window === 'undefined' || !('Notification' in window) || !window.Notification) {
-          console.warn('Notification API not available');
-          return;
-        }
-        
-        // Check permission safely
-        const permission = window.Notification?.permission;
-        if (permission !== 'granted') {
-          console.warn('Notification permission not granted:', permission);
-          return;
-        }
-        
-        const notification = new window.Notification(fcmNotification.title, {
-          body: fcmNotification.content,
-          icon: '/placeholder-logo.png',
-          badge: '/placeholder-logo.png',
-          tag: fcmNotification.id,
-          requireInteraction: false,
-        });
-
-        // Handle click on notification
-        notification.onclick = (event) => {
-          event.preventDefault();
-          window.focus();
-          
-          // Navigate to notification details or handle custom data
-          if (payload.data?.url) {
-            window.open(payload.data.url, '_blank');
-          }
-          
-          notification.close();
-        };
-      } catch (error) {
-        console.error('Error showing notification:', error);
-      }
     };
 
-    // Setup listener
     fcmService.setupForegroundListener(handleFCMMessage);
 
-    // Also listen for service worker messages (background notifications)
     if ('serviceWorker' in navigator) {
       const messageHandler = (event: MessageEvent) => {
-        if (event.data && event.data.firebaseMessaging) {
-          const payload = event.data.firebaseMessaging;
-          handleFCMMessage(payload);
-        }
+        if (event.data?.firebaseMessaging) handleFCMMessage(event.data.firebaseMessaging);
       };
-      
       navigator.serviceWorker.addEventListener('message', messageHandler);
-      
-      return () => {
-        navigator.serviceWorker.removeEventListener('message', messageHandler);
-      };
+      return () => navigator.serviceWorker.removeEventListener('message', messageHandler);
     }
-  }, []); // Empty dependency array - setup once
+  }, []);
 
   const markAsRead = async (notificationId: number | string) => {
-    // Check if it's an FCM notification (string ID)
     if (typeof notificationId === 'string' && notificationId.startsWith('fcm-')) {
-      setFcmNotifications(prev =>
-        prev.map(notif =>
-          notif.id === notificationId ? { ...notif, is_read: true } : notif
-        )
-      );
-      
-      // Update localStorage
-      const updated = fcmNotifications.map(notif =>
-        notif.id === notificationId ? { ...notif, is_read: true } : notif
-      );
-      localStorage.setItem('fcm_notifications', JSON.stringify(updated));
-      
-      toast.success('Notification marquée comme lue');
+      setFcmNotifications(prev => {
+        const updated = prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n);
+        localStorage.setItem('fcm_notifications', JSON.stringify(updated));
+        return updated;
+      });
+      toast.success('Marqué comme lu');
       return;
     }
-
-    // Backend notification (number ID)
-    try {
-      // TODO: Implement mark as read API call if available
-      setNotifications(prev =>
-        prev.map(notif =>
-          notif.id === notificationId ? { ...notif, is_read: true } : notif
-        )
-      );
-      toast.success('Notification marquée comme lue');
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      toast.error('Échec de la mise à jour de la notification');
-    }
+    setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n));
+    toast.success('Marqué comme lu');
   };
 
   const formatDate = (dateString: string) => {
-    try {
-      return format(parseISO(dateString), 'PPP p', { locale: fr });
-    } catch {
-      return dateString;
-    }
+    try { return format(parseISO(dateString), 'dd MMM yyyy, HH:mm', { locale: fr }); }
+    catch { return dateString; }
   };
 
-  // Combine backend and FCM notifications, sorted by date (newest first)
-  const allNotifications: CombinedNotification[] = [
-    ...fcmNotifications,
-    ...notifications,
-  ].sort((a, b) => {
-    const dateA = new Date(a.created_at).getTime();
-    const dateB = new Date(b.created_at).getTime();
-    return dateB - dateA; // Newest first
-  });
+  const allNotifications: CombinedNotification[] = [...fcmNotifications, ...notifications]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const unreadCount = allNotifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="space-y-6">
-        {/* Header with Back Button */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.back()}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Retour
-            </Button>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Bell className="h-6 w-6" />
-                <h1 className="text-3xl font-bold">Notifications</h1>
+    <div className="max-w-2xl mx-auto px-4 py-6">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <button
+          onClick={() => router.back()}
+          className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex items-center gap-3 flex-1">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#3FA9FF] to-[#0066FF] flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <Bell className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Notifications</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {unreadCount > 0 ? `${unreadCount} non lue(s)` : 'Tout est lu'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => fetchNotifications()}
+          disabled={isRefreshing}
+          className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-[#3FA9FF] hover:text-[#3FA9FF] transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Content */}
+      {isLoading ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 text-[#3FA9FF] animate-spin" />
+        </div>
+      ) : allNotifications.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center py-16 px-4">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+            <Bell className="w-8 h-8 text-slate-400" />
+          </div>
+          <p className="font-medium text-slate-600 dark:text-slate-300">Aucune notification</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 text-center">
+            Vos notifications apparaîtront ici
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+          {allNotifications.map((notification, index) => {
+            const isFCM = 'is_fcm' in notification && notification.is_fcm;
+            
+            return (
+              <div
+                key={notification.id}
+                className={`p-4 ${index !== allNotifications.length - 1 ? 'border-b border-slate-100 dark:border-slate-800' : ''} ${!notification.is_read ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isFCM ? 'bg-violet-500/10 text-violet-500' : 'bg-[#3FA9FF]/10 text-[#3FA9FF]'}`}>
+                    {isFCM ? <MessageSquare className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-slate-900 dark:text-white text-sm">{notification.title}</h3>
+                      {!notification.is_read && (
+                        <span className="w-2 h-2 rounded-full bg-[#3FA9FF]" />
+                      )}
+                      {isFCM && (
+                        <span className="px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 text-[10px] font-medium">
+                          Push
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                      {notification.content}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400 dark:text-slate-500">
+                        {formatDate(notification.created_at)}
+                      </span>
+                      {!notification.is_read && (
+                        <button
+                          onClick={() => markAsRead(notification.id)}
+                          className="flex items-center gap-1 text-xs text-[#3FA9FF] hover:text-[#0066FF] font-medium transition-colors"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Marquer lu
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className="text-muted-foreground">
-                Votre centre de notifications
-              </p>
-            </div>
-          </div>
-          
-          {unreadCount > 0 && (
-            <Badge variant="secondary" className="text-lg px-3 py-1">
-              {unreadCount} non {unreadCount === 1 ? 'lue' : 'lues'}
-            </Badge>
-          )}
-        </div>
+            );
+          })}
 
-        {/* Refresh Button */}
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchNotifications()}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Actualisation...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Actualiser
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* Loading State */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : allNotifications.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Bell className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground text-center">
-                Aucune notification pour le moment
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {/* Notifications List */}
-            <div className="space-y-4">
-              {allNotifications.map((notification) => {
-                const isFCM = 'is_fcm' in notification && notification.is_fcm;
-                
-                return (
-                  <Card
-                    key={notification.id}
-                    className={`transition-all hover:shadow-md ${
-                      !notification.is_read ? 'border-primary/50' : ''
-                    } ${isFCM ? 'border-purple-500/30' : ''}`}
-                  >
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2">
-                            {isFCM && (
-                              <MessageSquare className="h-4 w-4 text-purple-500" />
-                            )}
-                            <h3 className="font-semibold text-lg">
-                              {notification.title}
-                            </h3>
-                            {!notification.is_read && (
-                              <span className="h-2 w-2 rounded-full bg-primary" />
-                            )}
-                            {isFCM && (
-                              <Badge variant="outline" className="text-xs">
-                                Notification push
-                              </Badge>
-                            )}
-                          </div>
-                          
-                          <p className="text-muted-foreground">
-                            {notification.content}
-                          </p>
-                          
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>{formatDate(notification.created_at)}</span>
-                            {'reference' in notification && notification.reference && (
-                              <span>Réf. : {notification.reference}</span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {!notification.is_read && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => markAsRead(notification.id)}
-                            className="flex items-center gap-2"
-                          >
-                            <Check className="h-4 w-4" />
-                            <span className="hidden sm:inline">Marquer comme lu</span>
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-
-            {/* Pagination */}
-            {(hasNext || hasPrevious) && (
-              <div className="flex items-center justify-center gap-4">
-                <Button
-                  variant="outline"
+          {/* Pagination */}
+          {(hasNext || hasPrevious) && (
+            <div className="flex items-center justify-between p-4 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-xs text-slate-500">Page {page}</p>
+              <div className="flex gap-2">
+                <button
                   onClick={() => fetchNotifications(page - 1)}
                   disabled={!hasPrevious || isLoading}
+                  className="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-[#3FA9FF] hover:text-[#3FA9FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Précédent
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {page}
-                </span>
-                <Button
-                  variant="outline"
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
                   onClick={() => fetchNotifications(page + 1)}
                   disabled={!hasNext || isLoading}
+                  className="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-[#3FA9FF] hover:text-[#3FA9FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Suivant
-                </Button>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
-            )}
-          </>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

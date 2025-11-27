@@ -2,12 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Search, Filter, RefreshCw } from "lucide-react"
+import { Loader2, Search, RefreshCw, ArrowDownToLine, ArrowUpFromLine, Clock, CheckCircle2, XCircle, AlertCircle, ChevronLeft, ChevronRight, History } from "lucide-react"
+import Link from "next/link"
 import { transactionApi } from "@/lib/api-client"
 import type { Transaction } from "@/lib/types"
 import { toast } from "react-hot-toast"
@@ -23,7 +19,6 @@ export default function TransactionHistoryPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   
-  // Filters
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState<"all" | "deposit" | "withdrawal">("all")
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "accept" | "reject" | "timeout">("all")
@@ -32,11 +27,8 @@ export default function TransactionHistoryPage() {
     fetchTransactions()
   }, [currentPage, searchTerm, typeFilter, statusFilter])
 
-  // Refetch data when the page gains focus to ensure fresh data
   useEffect(() => {
-    const handleFocus = () => {
-      fetchTransactions()
-    }
+    const handleFocus = () => fetchTransactions()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [])
@@ -44,11 +36,7 @@ export default function TransactionHistoryPage() {
   const fetchTransactions = async () => {
     setIsLoading(true)
     try {
-      const params: any = {
-        page: currentPage,
-        page_size: 10,
-      }
-      
+      const params: any = { page: currentPage, page_size: 10 }
       if (searchTerm) params.search = searchTerm
       if (typeFilter !== "all") params.type_trans = typeFilter
       if (statusFilter !== "all") params.status = statusFilter
@@ -58,231 +46,174 @@ export default function TransactionHistoryPage() {
       setTotalCount(data.count)
       setTotalPages(Math.ceil(data.count / 10))
     } catch (error) {
-      toast.error("Erreur lors du chargement de l'historique")
+      toast.error("Erreur lors du chargement")
     } finally {
       setIsLoading(false)
     }
   }
 
-  const getStatusBadge = (status: Transaction["status"]) => {
-    const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      pending: { variant: "secondary", label: "En attente" },
-      accept: { variant: "default", label: "Accepté" },
-      init_payment: { variant: "secondary", label: "En attente" },
-      error: { variant: "destructive", label: "Erreur" },
-      reject: { variant: "destructive", label: "Rejeté" },
-      timeout: { variant: "outline", label: "Expiré" },
+  const getStatusConfig = (status: Transaction["status"]) => {
+    const configs: Record<string, { icon: any; color: string; bg: string; label: string }> = {
+      pending: { icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", label: "En attente" },
+      accept: { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Accepté" },
+      init_payment: { icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", label: "En attente" },
+      error: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", label: "Erreur" },
+      reject: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", label: "Rejeté" },
+      timeout: { icon: AlertCircle, color: "text-slate-500", bg: "bg-slate-500/10", label: "Expiré" },
     }
-    
-    const config = statusConfig[status] || { variant: "outline" as const, label: status }
-    return <Badge variant={config.variant}>{config.label}</Badge>
-  }
-
-  const getTypeBadge = (type: Transaction["type_trans"]) => {
-    return (
-      <Badge variant={type === "deposit" ? "default" : "secondary"}>
-        {type === "deposit" ? "Dépôt" : "Retrait"}
-      </Badge>
-    )
-  }
-
-  const handleSearch = (value: string) => {
-    setSearchTerm(value)
-    setCurrentPage(1)
-  }
-
-  const handleFilterChange = (filterType: string, value: string) => {
-    if (filterType === "type") {
-      setTypeFilter(value as any)
-    } else if (filterType === "status") {
-      setStatusFilter(value as any)
-    }
-    setCurrentPage(1)
-  }
-
-  const clearFilters = () => {
-    setSearchTerm("")
-    setTypeFilter("all")
-    setStatusFilter("all")
-    setCurrentPage(1)
+    return configs[status] || configs.timeout
   }
 
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">Veuillez vous connecter pour voir l'historique</p>
+        <p className="text-slate-500">Veuillez vous connecter</p>
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-        {/* Header */}
-        <div className="space-y-2">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Historique des transactions</h1>
-          <p className="text-base sm:text-lg text-muted-foreground">
-            Consultez toutes vos transactions de dépôt et de retrait
-          </p>
+    <div className="max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <Link
+          href="/dashboard"
+          className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </Link>
+        <div className="flex items-center gap-3 flex-1">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#3FA9FF] to-[#0066FF] flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <History className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Historique</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{totalCount} transactions</p>
+          </div>
         </div>
+        <button
+          onClick={fetchTransactions}
+          disabled={isLoading}
+          className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-[#3FA9FF] hover:text-[#3FA9FF] transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
 
-        {/* Filters */}
-        <Card className="shadow-md">
-          <CardHeader className="p-5 sm:p-6 bg-gradient-to-br from-muted/30 to-muted/10">
-            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-              <Filter className="h-5 w-5 sm:h-6 sm:w-6" />
-              Filtres
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-5 sm:p-6 pt-5">
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="relative sm:col-span-2 lg:col-span-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Rechercher..."
-                  value={searchTerm}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-10 h-10 sm:h-9 text-base sm:text-sm"
-                />
-              </div>
-              
-              <Select value={typeFilter} onValueChange={(value) => handleFilterChange("type", value)}>
-                <SelectTrigger className="h-10 sm:h-9 text-base sm:text-sm">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les types</SelectItem>
-                  <SelectItem value="deposit">Dépôts</SelectItem>
-                  <SelectItem value="withdrawal">Retraits</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={statusFilter} onValueChange={(value) => handleFilterChange("status", value)}>
-                <SelectTrigger className="h-10 sm:h-9 text-base sm:text-sm">
-                  <SelectValue placeholder="Statut" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="pending">En attente</SelectItem>
-                  <SelectItem value="accept">Accepté</SelectItem>
-                  <SelectItem value="reject">Rejeté</SelectItem>
-                  <SelectItem value="timeout">Expiré</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Button variant="outline" onClick={clearFilters} className="h-10 sm:h-9 text-sm">
-                Effacer
-              </Button>
+      {/* Filters */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Rechercher..."
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
+              className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:ring-2 focus:ring-[#3FA9FF]/20 outline-none transition-all text-sm"
+            />
+          </div>
+          <select
+            value={typeFilter}
+            onChange={(e) => { setTypeFilter(e.target.value as any); setCurrentPage(1) }}
+            className="h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#3FA9FF] focus:ring-2 focus:ring-[#3FA9FF]/20 outline-none text-sm"
+          >
+            <option value="all">Tous types</option>
+            <option value="deposit">Dépôts</option>
+            <option value="withdrawal">Retraits</option>
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value as any); setCurrentPage(1) }}
+            className="h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#3FA9FF] focus:ring-2 focus:ring-[#3FA9FF]/20 outline-none text-sm"
+          >
+            <option value="all">Tous statuts</option>
+            <option value="pending">En attente</option>
+            <option value="accept">Accepté</option>
+            <option value="reject">Rejeté</option>
+            <option value="timeout">Expiré</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Transactions List */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 text-[#3FA9FF] animate-spin" />
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+              <History className="w-7 h-7 text-slate-400" />
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Transactions List */}
-        <Card className="shadow-md">
-          <CardHeader className="p-5 sm:p-6 bg-gradient-to-br from-muted/30 to-muted/10">
-            <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-lg sm:text-xl">
-              <span>Transactions ({totalCount})</span>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={fetchTransactions}
-                disabled={isLoading}
-                className="h-9 w-9 sm:h-10 sm:w-auto p-0 sm:px-4 self-start sm:self-auto border-2 hover:bg-muted/50 transition-all"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline ml-2">Actualiser</span>
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-5 sm:p-6 pt-5">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin" />
-              </div>
-            ) : transactions.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">Aucune transaction trouvée</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Vos transactions apparaîtront ici une fois effectuées
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3 sm:space-y-4">
-                {transactions.map((transaction) => (
-                  <Card key={transaction.id} className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-transparent hover:border-l-primary">
-                    <CardContent className="p-4 sm:p-5 lg:p-6">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-                        <div className="flex-1 min-w-0 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold text-sm sm:text-base">#{transaction.reference}</h3>
-                            {getTypeBadge(transaction.type_trans)}
-                            {getStatusBadge(transaction.status)}
-                          </div>
-                          <div className="text-xs sm:text-sm text-muted-foreground space-y-1">
-                            <p className="truncate">Plateforme: {transaction.app}</p>
-                            <p className="truncate">ID de pari: {transaction.user_app_id}</p>
-                            <p className="truncate">Téléphone: {formatPhoneNumberForDisplay(transaction.phone_number)}</p>
-                            {transaction.withdriwal_code && (
-                              <p className="truncate">Code de retrait: {transaction.withdriwal_code}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-left sm:text-right flex-shrink-0 space-y-2">
-                          <p className="text-base sm:text-lg font-semibold">
-                            {transaction.amount.toLocaleString("fr-FR", {
-                              style: "currency",
-                              currency: "XOF",
-                              minimumFractionDigits: 0,
-                            })}
-                          </p>
-                          <p className="text-xs sm:text-sm text-muted-foreground">
-                            {format(new Date(transaction.created_at), "dd MMM yyyy à HH:mm", {
-                              locale: fr,
-                            })}
-                          </p>
-                          {transaction.error_message && (
-                            <p className="text-xs sm:text-sm text-red-500 break-words">
-                              Erreur: {transaction.error_message}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 mt-4 sm:mt-6">
-                <p className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
-                  Page {currentPage} sur {totalPages} ({totalCount} transactions)
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="h-9 text-xs sm:text-sm"
-                  >
-                    Précédent
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="h-9 text-xs sm:text-sm"
-                  >
-                    Suivant
-                  </Button>
+            <p className="font-medium text-slate-600 dark:text-slate-300">Aucune transaction</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Vos transactions apparaîtront ici</p>
+          </div>
+        ) : (
+          <div>
+            {transactions.map((transaction, index) => {
+              const statusConfig = getStatusConfig(transaction.status)
+              const StatusIcon = statusConfig.icon
+              const isDeposit = transaction.type_trans === "deposit"
+              
+              return (
+                <div 
+                  key={transaction.id}
+                  className={`flex items-center gap-4 p-4 ${index !== transactions.length - 1 ? 'border-b border-slate-100 dark:border-slate-800' : ''}`}
+                >
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isDeposit ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                    {isDeposit ? <ArrowDownToLine className="w-5 h-5" /> : <ArrowUpFromLine className="w-5 h-5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-900 dark:text-white text-sm">#{transaction.reference}</span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium ${statusConfig.bg} ${statusConfig.color}`}>
+                        <StatusIcon className="w-3 h-3" />
+                        {statusConfig.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
+                      {transaction.app_details?.name || transaction.app} • {formatPhoneNumberForDisplay(transaction.phone_number)}
+                    </p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                      {format(new Date(transaction.created_at), "dd MMM yyyy, HH:mm", { locale: fr })}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`font-bold ${isDeposit ? 'text-emerald-500' : 'text-amber-500'}`}>
+                      {isDeposit ? '+' : '−'}{transaction.amount.toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-slate-400">FCFA</p>
+                  </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t border-slate-100 dark:border-slate-800">
+            <p className="text-xs text-slate-500">Page {currentPage}/{totalPages}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-[#3FA9FF] hover:text-[#3FA9FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-[#3FA9FF] hover:text-[#3FA9FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

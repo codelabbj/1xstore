@@ -4,37 +4,11 @@ import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { phoneApi, userAppIdApi, networkApi, platformApi } from "@/lib/api-client"
 import type { UserPhone, UserAppId, Network, Platform } from "@/lib/types"
 import { toast } from "react-hot-toast"
-import { Loader2, Phone, Plus, Trash2, Edit, Smartphone } from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Loader2, Phone, Plus, Trash2, Edit, Smartphone, ChevronLeft, X, Check } from "lucide-react"
+import Link from "next/link"
 import { formatPhoneNumberForDisplay } from "@/lib/utils"
 
 const COUNTRY_OPTIONS = [
@@ -49,23 +23,14 @@ const DEFAULT_COUNTRY_VALUE = "ci"
 const buildInternationalPhone = (input: string, countryValue: string) => {
   const country = COUNTRY_OPTIONS.find(option => option.value === countryValue)
   if (!country) return input.trim()
-
   let sanitized = input.trim().replace(/\s+/g, "")
   if (!sanitized) return `${country.prefix}`
-
-  if (sanitized.startsWith(country.prefix)) {
-    sanitized = sanitized.slice(country.prefix.length)
-  } else {
+  if (sanitized.startsWith(country.prefix)) sanitized = sanitized.slice(country.prefix.length)
+  else {
     const numericPrefix = country.prefix.replace("+", "")
-    if (sanitized.startsWith(numericPrefix)) {
-      sanitized = sanitized.slice(numericPrefix.length)
-    }
+    if (sanitized.startsWith(numericPrefix)) sanitized = sanitized.slice(numericPrefix.length)
   }
-
-  if (sanitized.startsWith("+")) {
-    sanitized = sanitized.slice(1)
-  }
-
+  if (sanitized.startsWith("+")) sanitized = sanitized.slice(1)
   return `${country.prefix}${sanitized}`
 }
 
@@ -73,27 +38,14 @@ const parsePhoneByCountry = (phone: string) => {
   const sanitized = phone.replace(/\s+/g, "")
   for (const country of COUNTRY_OPTIONS) {
     if (sanitized.startsWith(country.prefix)) {
-      return {
-        countryValue: country.value,
-        localNumber: sanitized.slice(country.prefix.length),
-      }
+      return { countryValue: country.value, localNumber: sanitized.slice(country.prefix.length) }
     }
   }
-  return {
-    countryValue: DEFAULT_COUNTRY_VALUE,
-    localNumber: sanitized,
-  }
+  return { countryValue: DEFAULT_COUNTRY_VALUE, localNumber: sanitized }
 }
 
-const phoneSchema = z.object({
-  phone: z.string().min(8, "Numéro de téléphone invalide"),
-  network: z.number().min(1, "Réseau requis"),
-})
-
-const appIdSchema = z.object({
-  user_app_id: z.string().min(1, "ID de pari requis"),
-  app: z.string().min(1, "Plateforme requise"),
-})
+const phoneSchema = z.object({ phone: z.string().min(8, "Numéro invalide"), network: z.number().min(1, "Réseau requis") })
+const appIdSchema = z.object({ user_app_id: z.string().min(1, "ID requis"), app: z.string().min(1, "Plateforme requise") })
 
 type PhoneFormData = z.infer<typeof phoneSchema>
 type AppIdFormData = z.infer<typeof appIdSchema>
@@ -104,40 +56,28 @@ export default function PhonesPage() {
   const [userAppIds, setUserAppIds] = useState<UserAppId[]>([])
   const [networks, setNetworks] = useState<Network[]>([])
   const [platforms, setPlatforms] = useState<Platform[]>([])
-  const [isPhoneDialogOpen, setIsPhoneDialogOpen] = useState(false)
-  const [isAppIdDialogOpen, setIsAppIdDialogOpen] = useState(false)
+  const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false)
+  const [isAppIdModalOpen, setIsAppIdModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [editingPhone, setEditingPhone] = useState<UserPhone | null>(null)
   const [editingAppId, setEditingAppId] = useState<UserAppId | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ type: "phone" | "appId"; id: number } | null>(null)
   const [selectedCountry, setSelectedCountry] = useState<string>(DEFAULT_COUNTRY_VALUE)
   const [editingCountry, setEditingCountry] = useState<string>(DEFAULT_COUNTRY_VALUE)
-  
-  // Bet ID search states
+  const [activeTab, setActiveTab] = useState<'phones' | 'betIds'>('phones')
   const [isSearching, setIsSearching] = useState(false)
-  const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false)
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [searchResult, setSearchResult] = useState<{ name: string; userId: number; currencyId: number } | null>(null)
   const [pendingBetId, setPendingBetId] = useState<{ appId: string; betId: string } | null>(null)
 
-  const phoneForm = useForm<PhoneFormData>({
-    resolver: zodResolver(phoneSchema),
-  })
+  const phoneForm = useForm<PhoneFormData>({ resolver: zodResolver(phoneSchema) })
+  const appIdForm = useForm<AppIdFormData>({ resolver: zodResolver(appIdSchema) })
 
-  const appIdForm = useForm<AppIdFormData>({
-    resolver: zodResolver(appIdSchema),
-  })
-
+  useEffect(() => { loadData() }, [])
   useEffect(() => {
-    loadData()
-  }, [])
-
-  // Refetch data when the page gains focus to ensure fresh data
-  useEffect(() => {
-    const handleFocus = () => {
-      loadData()
-    }
+    const handleFocus = () => loadData()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [])
@@ -146,21 +86,12 @@ export default function PhonesPage() {
     setIsLoading(true)
     try {
       const [phonesData, networksData, platformsData] = await Promise.all([
-        phoneApi.getAll(),
-        networkApi.getAll(),
-        platformApi.getAll(),
+        phoneApi.getAll(), networkApi.getAll(), platformApi.getAll()
       ])
       setUserPhones(phonesData)
       setNetworks(networksData)
       setPlatforms(platformsData)
-
-      // Load all app IDs
-      try {
-        const appIds = await userAppIdApi.getAll()
-        setUserAppIds(appIds)
-      } catch (error) {
-        console.error("Failed to load app IDs:", error)
-      }
+      try { const appIds = await userAppIdApi.getAll(); setUserAppIds(appIds) } catch {}
     } catch (error) {
       console.error("Failed to load data:", error)
     } finally {
@@ -173,101 +104,69 @@ export default function PhonesPage() {
     try {
       const countryValue = editingPhone ? editingCountry : selectedCountry
       const phoneWithPrefix = buildInternationalPhone(data.phone, countryValue)
-      
       if (editingPhone) {
         await phoneApi.update(editingPhone.id, phoneWithPrefix, data.network)
-        toast.success("Numéro modifié avec succès!")
+        toast.success("Numéro modifié!")
       } else {
         await phoneApi.create(phoneWithPrefix, data.network)
-        toast.success("Numéro ajouté avec succès!")
+        toast.success("Numéro ajouté!")
       }
-      setIsPhoneDialogOpen(false)
+      setIsPhoneModalOpen(false)
       phoneForm.reset()
       setEditingPhone(null)
-      setSelectedCountry(DEFAULT_COUNTRY_VALUE)
-      setEditingCountry(DEFAULT_COUNTRY_VALUE)
       loadData()
     } catch (error) {
-      console.error("Phone operation error:", error)
+      toast.error("Erreur")
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleAppIdSubmit = async (data: AppIdFormData) => {
-    // If editing, update directly without search
     if (editingAppId) {
       setIsSubmitting(true)
       try {
         await userAppIdApi.update(editingAppId.id, data.user_app_id, data.app)
-        toast.success("ID de pari modifié avec succès!")
-        setIsAppIdDialogOpen(false)
+        toast.success("ID modifié!")
+        setIsAppIdModalOpen(false)
         appIdForm.reset()
         setEditingAppId(null)
         loadData()
-      } catch (error) {
-        console.error("App ID operation error:", error)
-      } finally {
-        setIsSubmitting(false)
-      }
+      } catch { toast.error("Erreur") }
+      finally { setIsSubmitting(false) }
       return
     }
 
-    // For new bet IDs, search first
     setIsSearching(true)
     try {
       const response = await userAppIdApi.searchUser(data.app, data.user_app_id)
-      
-      // Validate user exists
       if (response.UserId === 0) {
-        setErrorMessage("Utilisateur non trouvé avec cet ID de pari.")
+        setErrorMessage("Utilisateur non trouvé avec cet ID.")
         setIsErrorModalOpen(true)
-        setIsAppIdDialogOpen(false)
+        setIsAppIdModalOpen(false)
         return
       }
-
-      // Validate currency
       if (response.CurrencyId !== 27) {
-        setErrorMessage("Cet utilisateur n'utilise pas la devise XOF. Seuls les utilisateurs avec la devise XOF peuvent être ajoutés.")
+        setErrorMessage("Cet utilisateur n'utilise pas la devise XOF.")
         setIsErrorModalOpen(true)
-        setIsAppIdDialogOpen(false)
+        setIsAppIdModalOpen(false)
         return
       }
-
-      // User is valid - show confirmation modal with search results
-      setSearchResult({
-        name: response.Name,
-        userId: response.UserId,
-        currencyId: response.CurrencyId,
-      })
+      setSearchResult({ name: response.Name, userId: response.UserId, currencyId: response.CurrencyId })
       setPendingBetId({ appId: data.app, betId: data.user_app_id })
-      setIsAppIdDialogOpen(false)
-      setIsConfirmationModalOpen(true)
+      setIsAppIdModalOpen(false)
+      setIsConfirmModalOpen(true)
     } catch (error: any) {
-      console.error("Search error:", error)
-      // Check for field-specific errors (400 status)
+      let errorMsg = "Erreur lors de la recherche"
       if (error.response?.status === 400) {
-        const errorData = error.response.data
-        let errorMsg = "Erreur lors de la recherche"
-        
-        if (errorData.user_app_id) {
-          errorMsg = Array.isArray(errorData.user_app_id) 
-            ? errorData.user_app_id[0] 
-            : errorData.user_app_id
-        } else if (errorData.app) {
-          errorMsg = Array.isArray(errorData.app) 
-            ? errorData.app[0] 
-            : errorData.app
-        } else if (errorData.detail || errorData.error || errorData.message) {
-          errorMsg = errorData.detail || errorData.error || errorData.message
-        }
-        
-        setErrorMessage(errorMsg)
-      } else {
-        setErrorMessage("Erreur lors de la recherche de l'utilisateur. Veuillez réessayer.")
+        const d = error.response.data
+        if (d.user_app_id) errorMsg = Array.isArray(d.user_app_id) ? d.user_app_id[0] : d.user_app_id
+        else if (d.app) errorMsg = Array.isArray(d.app) ? d.app[0] : d.app
+        else if (d.detail || d.error || d.message) errorMsg = d.detail || d.error || d.message
       }
+      setErrorMessage(errorMsg)
       setIsErrorModalOpen(true)
-      setIsAppIdDialogOpen(false)
+      setIsAppIdModalOpen(false)
     } finally {
       setIsSearching(false)
     }
@@ -275,586 +174,265 @@ export default function PhonesPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return
-
     try {
       if (deleteTarget.type === "phone") {
         await phoneApi.delete(deleteTarget.id)
-        toast.success("Numéro supprimé avec succès!")
+        toast.success("Numéro supprimé!")
       } else {
         await userAppIdApi.delete(deleteTarget.id)
-        toast.success("ID de pari supprimé avec succès!")
+        toast.success("ID supprimé!")
       }
       setDeleteTarget(null)
       loadData()
-    } catch (error) {
-      console.error("Delete error:", error)
-    }
+    } catch { toast.error("Erreur") }
   }
-
-  const openEditPhoneDialog = (phone: UserPhone) => {
-    const { countryValue, localNumber } = parsePhoneByCountry(phone.phone)
-    setEditingPhone(phone)
-    setEditingCountry(countryValue)
-    phoneForm.reset({
-      phone: localNumber,
-      network: phone.network,
-    })
-    setIsPhoneDialogOpen(true)
-  }
-
-  const openEditAppIdDialog = (appId: UserAppId) => {
-    setEditingAppId(appId)
-    appIdForm.reset({
-      user_app_id: appId.user_app_id,
-      app: appId.app?.toString() || "",
-    })
-    setIsAppIdDialogOpen(true)
-  }
-
-  const closePhoneDialog = () => {
-    setIsPhoneDialogOpen(false)
-    setEditingPhone(null)
-    setSelectedCountry(DEFAULT_COUNTRY_VALUE)
-    setEditingCountry(DEFAULT_COUNTRY_VALUE)
-    phoneForm.reset()
-  }
-
-  const closeAppIdDialog = () => {
-    setIsAppIdDialogOpen(false)
-    setEditingAppId(null)
-    appIdForm.reset()
-  }
-
 
   const handleConfirmAddBetId = async () => {
     if (!pendingBetId) return
-
     setIsSubmitting(true)
     try {
       await userAppIdApi.create(pendingBetId.betId, pendingBetId.appId)
-      toast.success("ID de pari ajouté avec succès!")
-      setIsConfirmationModalOpen(false)
+      toast.success("ID ajouté!")
+      setIsConfirmModalOpen(false)
       setPendingBetId(null)
       setSearchResult(null)
       appIdForm.reset()
       loadData()
     } catch (error: any) {
-      console.error("Add bet ID error:", error)
-      let errorMsg = "Erreur lors de l'ajout de l'ID de pari"
-      
+      let errorMsg = "Erreur lors de l'ajout"
       if (error.response?.status === 400) {
-        const errorData = error.response.data
-        if (errorData.user_app_id) {
-          errorMsg = Array.isArray(errorData.user_app_id) 
-            ? errorData.user_app_id[0] 
-            : errorData.user_app_id
-        } else if (errorData.detail || errorData.error || errorData.message) {
-          errorMsg = errorData.detail || errorData.error || errorData.message
-        }
+        const d = error.response.data
+        if (d.user_app_id) errorMsg = Array.isArray(d.user_app_id) ? d.user_app_id[0] : d.user_app_id
+        else if (d.detail || d.error || d.message) errorMsg = d.detail || d.error || d.message
       }
-      
       toast.error(errorMsg)
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const openEditPhone = (phone: UserPhone) => {
+    const { countryValue, localNumber } = parsePhoneByCountry(phone.phone)
+    setEditingPhone(phone)
+    setEditingCountry(countryValue)
+    phoneForm.reset({ phone: localNumber, network: phone.network })
+    setIsPhoneModalOpen(true)
+  }
+
+  const openEditAppId = (appId: UserAppId) => {
+    setEditingAppId(appId)
+    appIdForm.reset({ user_app_id: appId.user_app_id, app: appId.app?.toString() || "" })
+    setIsAppIdModalOpen(true)
+  }
+
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Phone className="h-6 w-6 sm:h-8 sm:w-8" />
-          Mes numéros et IDs
-        </h1>
-        <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">Gérez vos numéros de téléphone et IDs de pari</p>
+    <div className="max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <Link href="/dashboard" className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+          <ChevronLeft className="w-5 h-5" />
+        </Link>
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#3FA9FF] to-[#0066FF] flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <Phone className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Mes numéros & IDs</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Gérez vos informations</p>
+          </div>
+        </div>
       </div>
 
-      <Tabs defaultValue="phones" className="space-y-4">
-        <TabsList className="w-full sm:w-auto">
-          <TabsTrigger value="phones" className="flex-1 sm:flex-initial text-xs sm:text-sm">Numéros</TabsTrigger>
-          <TabsTrigger value="appIds" className="flex-1 sm:flex-initial text-xs sm:text-sm">IDs de pari</TabsTrigger>
-        </TabsList>
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6">
+        <button onClick={() => setActiveTab('phones')} className={`flex-1 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === 'phones' ? 'bg-[#3FA9FF] text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'}`}>
+          Numéros ({userPhones.length})
+        </button>
+        <button onClick={() => setActiveTab('betIds')} className={`flex-1 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === 'betIds' ? 'bg-[#3FA9FF] text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'}`}>
+          IDs de pari ({userAppIds.length})
+        </button>
+      </div>
 
-        {/* Phone Numbers Tab */}
-        <TabsContent value="phones" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 p-4 sm:p-6">
+      {/* Content */}
+      {isLoading ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 text-[#3FA9FF] animate-spin" />
+        </div>
+      ) : activeTab === 'phones' ? (
+        <div className="space-y-3">
+          <button onClick={() => { setEditingPhone(null); phoneForm.reset(); setIsPhoneModalOpen(true) }} className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-medium text-sm flex items-center justify-center gap-2 hover:border-[#3FA9FF] hover:text-[#3FA9FF] transition-colors">
+            <Plus className="w-4 h-4" /> Ajouter un numéro
+          </button>
+          {userPhones.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center py-12 px-4">
+              <Smartphone className="w-10 h-10 text-slate-400 mb-3" />
+              <p className="text-slate-500 dark:text-slate-400">Aucun numéro enregistré</p>
+            </div>
+          ) : userPhones.map((phone) => (
+            <div key={phone.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#3FA9FF]/10 flex items-center justify-center flex-shrink-0">
+                <Phone className="w-5 h-5 text-[#3FA9FF]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-slate-900 dark:text-white">{formatPhoneNumberForDisplay(phone.phone)}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{networks.find(n => n.id === phone.network)?.name || "Réseau"}</p>
+              </div>
+              <button onClick={() => openEditPhone(phone)} className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-[#3FA9FF]/10 hover:text-[#3FA9FF] transition-colors">
+                <Edit className="w-4 h-4" />
+              </button>
+              <button onClick={() => setDeleteTarget({ type: "phone", id: phone.id })} className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30 transition-colors">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <button onClick={() => { setEditingAppId(null); appIdForm.reset(); setIsAppIdModalOpen(true) }} className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-medium text-sm flex items-center justify-center gap-2 hover:border-[#3FA9FF] hover:text-[#3FA9FF] transition-colors">
+            <Plus className="w-4 h-4" /> Ajouter un ID de pari
+          </button>
+          {userAppIds.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center py-12 px-4">
+              <Smartphone className="w-10 h-10 text-slate-400 mb-3" />
+              <p className="text-slate-500 dark:text-slate-400">Aucun ID enregistré</p>
+            </div>
+          ) : userAppIds.map((appId) => (
+            <div key={appId.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                <Smartphone className="w-5 h-5 text-amber-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-slate-900 dark:text-white">{appId.user_app_id}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{appId.app_details?.name || platforms.find(p => p.id === appId.app)?.name || "Plateforme"}</p>
+              </div>
+              <button onClick={() => openEditAppId(appId)} className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-[#3FA9FF]/10 hover:text-[#3FA9FF] transition-colors">
+                <Edit className="w-4 h-4" />
+              </button>
+              <button onClick={() => setDeleteTarget({ type: "appId", id: appId.id })} className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30 transition-colors">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Phone Modal */}
+      {isPhoneModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">{editingPhone ? "Modifier" : "Ajouter"} un numéro</h2>
+              <button onClick={() => { setIsPhoneModalOpen(false); setEditingPhone(null); phoneForm.reset() }} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><X className="w-4 h-4" /></button>
+            </div>
+            <form onSubmit={phoneForm.handleSubmit(handlePhoneSubmit)} className="space-y-4">
               <div>
-                <CardTitle className="text-base sm:text-lg">Numéros de téléphone</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Gérez vos numéros de téléphone mobile</CardDescription>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Numéro</label>
+                <div className="flex gap-2">
+                  <select value={editingPhone ? editingCountry : selectedCountry} onChange={e => editingPhone ? setEditingCountry(e.target.value) : setSelectedCountry(e.target.value)} className="h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm">
+                    {COUNTRY_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.prefix}</option>)}
+                  </select>
+                  <input {...phoneForm.register("phone")} placeholder="07 12 34 56 78" className="flex-1 h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:border-[#3FA9FF] focus:ring-2 focus:ring-[#3FA9FF]/20 outline-none" />
+                </div>
+                {phoneForm.formState.errors.phone && <p className="text-xs text-red-500 mt-1">{phoneForm.formState.errors.phone.message}</p>}
               </div>
-              <Dialog open={isPhoneDialogOpen} onOpenChange={setIsPhoneDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => setEditingPhone(null)} size="sm" className="w-full sm:w-auto h-9 sm:h-10">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Ajouter un numéro
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-[95vw] sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="text-lg sm:text-xl">{editingPhone ? "Modifier le numéro" : "Ajouter un numéro"}</DialogTitle>
-                    <DialogDescription className="text-sm">
-                      {editingPhone
-                        ? "Modifiez les informations de votre numéro"
-                        : "Ajoutez un nouveau numéro de téléphone"}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={phoneForm.handleSubmit(handlePhoneSubmit)} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-sm sm:text-base">Numéro de téléphone</Label>
-                      <div className="flex gap-2">
-                        <Select
-                          value={editingPhone ? editingCountry : selectedCountry}
-                          onValueChange={(value) => {
-                            if (editingPhone) {
-                              setEditingCountry(value)
-                            } else {
-                              setSelectedCountry(value)
-                            }
-                          }}
-                          disabled={isSubmitting}
-                        >
-                          <SelectTrigger className="w-[170px] h-11 sm:h-10">
-                            <SelectValue placeholder="Choisir un pays" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {COUNTRY_OPTIONS.map(country => (
-                              <SelectItem key={country.value} value={country.value}>
-                                {country.label} ({country.prefix})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          id="phone"
-                          type="tel"
-                          placeholder="Ex: 07 12 34 56 78"
-                          {...phoneForm.register("phone")}
-                          onChange={(e) => {
-                            phoneForm.setValue("phone", e.target.value)
-                            // Auto-detect country from prefix if user types a full number with prefix
-                            const detected = parsePhoneByCountry(e.target.value)
-                            if (editingPhone) {
-                              if (detected.countryValue !== editingCountry) {
-                                setEditingCountry(detected.countryValue)
-                              }
-                            } else {
-                              if (detected.countryValue !== selectedCountry) {
-                                setSelectedCountry(detected.countryValue)
-                              }
-                            }
-                          }}
-                          disabled={isSubmitting}
-                          className="h-11 sm:h-10 text-base sm:text-sm flex-1"
-                        />
-                      </div>
-                      {phoneForm.formState.errors.phone && (
-                        <p className="text-xs sm:text-sm text-destructive">{phoneForm.formState.errors.phone.message}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="network" className="text-sm sm:text-base">Réseau mobile</Label>
-                      <Select
-                        onValueChange={(value) => phoneForm.setValue("network", Number.parseInt(value))}
-                        defaultValue={editingPhone?.network?.toString()}
-                        disabled={isSubmitting}
-                      >
-                        <SelectTrigger className="h-11 sm:h-10 text-base sm:text-sm">
-                          <SelectValue placeholder="Sélectionnez un réseau" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {networks.map((network) => (
-                            <SelectItem key={network.id} value={network.id?.toString() || ""}>
-                              {network.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {phoneForm.formState.errors.network && (
-                        <p className="text-xs sm:text-sm text-destructive">{phoneForm.formState.errors.network.message}</p>
-                      )}
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={closePhoneDialog}
-                        className="flex-1 bg-transparent h-11 sm:h-10 text-sm"
-                      >
-                        Annuler
-                      </Button>
-                      <Button type="submit" disabled={isSubmitting} className="flex-1 h-11 sm:h-10 text-sm">
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Enregistrement...
-                          </>
-                        ) : editingPhone ? (
-                          "Modifier"
-                        ) : (
-                          "Ajouter"
-                        )}
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : userPhones.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Smartphone className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Aucun numéro enregistré</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">Ajoutez votre premier numéro pour commencer</p>
-                </div>
-              ) : (
-                <>
-                  {/* Mobile Card View */}
-                  <div className="block sm:hidden space-y-3">
-                    {userPhones.map((phone) => (
-                      <Card key={phone.id}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{formatPhoneNumberForDisplay(phone.phone)}</p>
-                              <Badge variant="outline" className="mt-1 text-xs">
-                                {networks.find((n) => n.id === phone.network)?.name || "Inconnu"}
-                              </Badge>
-                            </div>
-                            <div className="flex gap-2 ml-2">
-                              <Button variant="ghost" size="icon" onClick={() => openEditPhoneDialog(phone)} className="h-9 w-9">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeleteTarget({ type: "phone", id: phone.id })}
-                                className="h-9 w-9"
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                  {/* Desktop Table View */}
-                  <div className="hidden sm:block rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Numéro</TableHead>
-                          <TableHead>Réseau</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {userPhones.map((phone) => (
-                          <TableRow key={phone.id}>
-                            <TableCell className="font-medium">{formatPhoneNumberForDisplay(phone.phone)}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {networks.find((n) => n.id === phone.network)?.name || "Inconnu"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => openEditPhoneDialog(phone)}>
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setDeleteTarget({ type: "phone", id: phone.id })}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* App IDs Tab */}
-        <TabsContent value="appIds" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 p-4 sm:p-6">
               <div>
-                <CardTitle className="text-base sm:text-lg">IDs de pari</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Gérez vos identifiants de plateformes de pari</CardDescription>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Réseau</label>
+                <select {...phoneForm.register("network", { valueAsNumber: true })} defaultValue={editingPhone?.network || ""} className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:border-[#3FA9FF] focus:ring-2 focus:ring-[#3FA9FF]/20 outline-none">
+                  <option value="">Choisir un réseau</option>
+                  {networks.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+                </select>
+                {phoneForm.formState.errors.network && <p className="text-xs text-red-500 mt-1">{phoneForm.formState.errors.network.message}</p>}
               </div>
-              <Dialog open={isAppIdDialogOpen} onOpenChange={setIsAppIdDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => setEditingAppId(null)} size="sm" className="w-full sm:w-auto h-9 sm:h-10">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Ajouter un ID
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-[95vw] sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="text-lg sm:text-xl">{editingAppId ? "Modifier l'ID" : "Ajouter un ID"}</DialogTitle>
-                    <DialogDescription className="text-sm">
-                      {editingAppId ? "Modifiez votre ID de pari" : "Ajoutez un nouvel ID de pari"}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={appIdForm.handleSubmit(handleAppIdSubmit)} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="app" className="text-sm sm:text-base">Plateforme de pari</Label>
-                      <Select
-                        onValueChange={(value) => appIdForm.setValue("app", value)}
-                        defaultValue={editingAppId?.app?.toString()}
-                        disabled={isSubmitting}
-                      >
-                        <SelectTrigger className="h-11 sm:h-10 text-base sm:text-sm">
-                          <SelectValue placeholder="Sélectionnez une plateforme" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {platforms.map((platform) => (
-                            <SelectItem key={platform.id} value={platform.id?.toString() || ""}>
-                              {platform.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {appIdForm.formState.errors.app && (
-                        <p className="text-xs sm:text-sm text-destructive">{appIdForm.formState.errors.app.message}</p>
-                      )}
-                    </div>
+              <button type="submit" disabled={isSubmitting} className="w-full h-12 rounded-xl bg-[#3FA9FF] text-white font-medium flex items-center justify-center gap-2 hover:bg-[#0066FF] transition-colors disabled:opacity-50">
+                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : editingPhone ? "Modifier" : "Ajouter"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="user_app_id" className="text-sm sm:text-base">ID de pari</Label>
-                      <Input
-                        id="user_app_id"
-                        type="text"
-                        placeholder="Votre ID sur la plateforme"
-                        {...appIdForm.register("user_app_id")}
-                        disabled={isSubmitting}
-                        className="h-11 sm:h-10 text-base sm:text-sm"
-                      />
-                      {appIdForm.formState.errors.user_app_id && (
-                        <p className="text-xs sm:text-sm text-destructive">{appIdForm.formState.errors.user_app_id.message}</p>
-                      )}
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={closeAppIdDialog}
-                        className="flex-1 bg-transparent h-11 sm:h-10 text-sm"
-                      >
-                        Annuler
-                      </Button>
-                      <Button type="submit" disabled={isSubmitting || isSearching} className="flex-1 h-11 sm:h-10 text-sm">
-                        {isSubmitting || isSearching ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {isSearching ? "Recherche..." : "Enregistrement..."}
-                          </>
-                        ) : editingAppId ? (
-                          "Modifier"
-                        ) : (
-                          "Ajouter"
-                        )}
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : userAppIds.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Smartphone className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Aucun ID enregistré</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">Ajoutez votre premier ID pour commencer</p>
-                </div>
-              ) : (
-                <>
-                  {/* Mobile Card View */}
-                  <div className="block sm:hidden space-y-3">
-                    {userAppIds.map((appId) => (
-                      <Card key={appId.id}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{appId.user_app_id}</p>
-                              <Badge variant="outline" className="mt-1 text-xs">
-                                {appId.app_details?.name || platforms.find((p) => p.id === appId.app)?.name || "Inconnu"}
-                              </Badge>
-                            </div>
-                            <div className="flex gap-2 ml-2">
-                              <Button variant="ghost" size="icon" onClick={() => openEditAppIdDialog(appId)} className="h-9 w-9">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeleteTarget({ type: "appId", id: appId.id })}
-                                className="h-9 w-9"
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                  {/* Desktop Table View */}
-                  <div className="hidden sm:block rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>ID de pari</TableHead>
-                          <TableHead>Plateforme</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {userAppIds.map((appId) => (
-                          <TableRow key={appId.id}>
-                            <TableCell className="font-medium">{appId.user_app_id}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {appId.app_details?.name || platforms.find((p) => p.id === appId.app)?.name || "Inconnu"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => openEditAppIdDialog(appId)}>
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setDeleteTarget({ type: "appId", id: appId.id })}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Êtes-vous sûr?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Cette action est irréversible. Cela supprimera définitivement{" "}
-              {deleteTarget?.type === "phone" ? "ce numéro" : "cet ID"}.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete} 
-              className="bg-destructive text-white hover:bg-destructive/90 hover:text-white focus:ring-destructive"
-            >
-              Supprimer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Bet ID Search Confirmation Modal */}
-      <Dialog open={isConfirmationModalOpen} onOpenChange={setIsConfirmationModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer l'ajout</DialogTitle>
-            <DialogDescription asChild>
-              <div className="text-muted-foreground text-sm space-y-2">
-                {searchResult && (
-                  <>
-                    <p>Utilisateur trouvé:</p>
-                    <div className="bg-muted p-3 rounded-md space-y-1">
-                      <p><strong>Nom:</strong> {searchResult.name}</p>
-                      <p><strong>ID utilisateur:</strong> {searchResult.userId}</p>
-                      <p><strong>Devise:</strong> XOF (ID: {searchResult.currencyId})</p>
-                    </div>
-                    <p className="mt-2">Voulez-vous ajouter cet ID de pari à votre liste?</p>
-                  </>
-                )}
+      {/* App ID Modal */}
+      {isAppIdModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">{editingAppId ? "Modifier" : "Ajouter"} un ID</h2>
+              <button onClick={() => { setIsAppIdModalOpen(false); setEditingAppId(null); appIdForm.reset() }} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><X className="w-4 h-4" /></button>
+            </div>
+            <form onSubmit={appIdForm.handleSubmit(handleAppIdSubmit)} className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Plateforme</label>
+                <select {...appIdForm.register("app")} defaultValue={editingAppId?.app?.toString() || ""} className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:border-[#3FA9FF] focus:ring-2 focus:ring-[#3FA9FF]/20 outline-none">
+                  <option value="">Choisir une plateforme</option>
+                  {platforms.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                {appIdForm.formState.errors.app && <p className="text-xs text-red-500 mt-1">{appIdForm.formState.errors.app.message}</p>}
               </div>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsConfirmationModalOpen(false)
-                setPendingBetId(null)
-                setSearchResult(null)
-              }}
-              disabled={isSubmitting}
-            >
-              Annuler
-            </Button>
-            <Button onClick={handleConfirmAddBetId} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Ajout...
-                </>
-              ) : (
-                "Confirmer"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">ID de pari</label>
+                <input {...appIdForm.register("user_app_id")} placeholder="Votre ID" className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:border-[#3FA9FF] focus:ring-2 focus:ring-[#3FA9FF]/20 outline-none" />
+                {appIdForm.formState.errors.user_app_id && <p className="text-xs text-red-500 mt-1">{appIdForm.formState.errors.user_app_id.message}</p>}
+              </div>
+              <button type="submit" disabled={isSubmitting || isSearching} className="w-full h-12 rounded-xl bg-[#3FA9FF] text-white font-medium flex items-center justify-center gap-2 hover:bg-[#0066FF] transition-colors disabled:opacity-50">
+                {isSubmitting || isSearching ? <><Loader2 className="w-5 h-5 animate-spin" />{isSearching ? "Recherche..." : ""}</> : editingAppId ? "Modifier" : "Ajouter"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
-      {/* Bet ID Search Error Modal */}
-      <Dialog open={isErrorModalOpen} onOpenChange={setIsErrorModalOpen}>
-        <DialogContent className="bg-white">
-          <DialogHeader>
-            <DialogTitle className="text-destructive">Erreur</DialogTitle>
-            <DialogDescription className="text-destructive">
-              {errorMessage}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsErrorModalOpen(false)
-                setErrorMessage("")
-              }}
-            >
-              Fermer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Delete Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-5 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/30 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6 text-red-500" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Supprimer?</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Cette action est irréversible.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 h-11 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Annuler</button>
+              <button onClick={handleDelete} className="flex-1 h-11 rounded-xl bg-red-500 text-white font-medium text-sm hover:bg-red-600 transition-colors">Supprimer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Modal */}
+      {isConfirmModalOpen && searchResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-5">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/30 flex items-center justify-center mx-auto mb-4">
+              <Check className="w-6 h-6 text-emerald-500" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2 text-center">Utilisateur trouvé</h2>
+            <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 mb-5">
+              <p className="text-sm"><span className="text-slate-500">Nom:</span> <span className="font-medium text-slate-900 dark:text-white">{searchResult.name}</span></p>
+              <p className="text-sm mt-1"><span className="text-slate-500">ID:</span> <span className="font-medium text-slate-900 dark:text-white">{searchResult.userId}</span></p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { setIsConfirmModalOpen(false); setPendingBetId(null); setSearchResult(null) }} disabled={isSubmitting} className="flex-1 h-11 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium text-sm">Annuler</button>
+              <button onClick={handleConfirmAddBetId} disabled={isSubmitting} className="flex-1 h-11 rounded-xl bg-[#3FA9FF] text-white font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirmer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {isErrorModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-5 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/30 flex items-center justify-center mx-auto mb-4">
+              <X className="w-6 h-6 text-red-500" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Erreur</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">{errorMessage}</p>
+            <button onClick={() => { setIsErrorModalOpen(false); setErrorMessage("") }} className="w-full h-11 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Fermer</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

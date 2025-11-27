@@ -3,7 +3,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.Africash.app",
+      "package_name": "com.1xstore.app",
       "sha256_cert_fingerprints": [
         "YOUR_ANDROID_APP_SHA256_FINGERPRINT_HERE"
       ]

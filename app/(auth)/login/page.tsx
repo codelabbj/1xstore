@@ -6,15 +6,10 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
 import { authApi } from "@/lib/api-client"
 import { toast } from "react-hot-toast"
-import { Loader2, Eye, EyeOff, Download, ArrowLeft } from "lucide-react"
+import { Loader2, Eye, EyeOff, Mail, Lock, ArrowLeft, ArrowRight, Download } from "lucide-react"
 import { setupNotifications } from "@/lib/fcm-helper"
 
 const loginSchema = z.object({
@@ -49,7 +44,7 @@ type ForgotPasswordOtpFormData = z.infer<typeof forgotPasswordOtpSchema>
 type ForgotPasswordNewPasswordFormData = z.infer<typeof forgotPasswordNewPasswordSchema>
 
 const APK_DOWNLOAD_URL = "/app-v1.0.5.apk"
-const APK_FILE_NAME = "Africash-v1.0.5.apk"
+const APK_FILE_NAME = "1xstore-v1.0.5.apk"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -60,7 +55,7 @@ export default function LoginPage() {
   
   // Forgot password states
   const [isForgotPassword, setIsForgotPassword] = useState(false)
-  const [forgotPasswordStep, setForgotPasswordStep] = useState(1) // 1: email, 2: otp, 3: new password
+  const [forgotPasswordStep, setForgotPasswordStep] = useState(1)
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
   const [forgotPasswordOtp, setForgotPasswordOtp] = useState("")
   const [isForgotPasswordLoading, setIsForgotPasswordLoading] = useState(false)
@@ -88,7 +83,6 @@ export default function LoginPage() {
     resolver: zodResolver(forgotPasswordNewPasswordSchema),
   })
 
-  // Load remembered credentials on mount
   useEffect(() => {
     const rememberedEmail = localStorage.getItem("remembered_email")
     const rememberedPassword = localStorage.getItem("remembered_password")
@@ -102,7 +96,6 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true)
     try {
-      // Handle remember me
       if (rememberMe) {
         localStorage.setItem("remembered_email", data.email_or_phone)
         localStorage.setItem("remembered_password", data.password)
@@ -111,42 +104,26 @@ export default function LoginPage() {
         localStorage.removeItem("remembered_password")
       }
 
-      // Step 1: Authenticate user
       const response = await authApi.login(data.email_or_phone, data.password)
       login(response.access, response.refresh, response.data)
-      
-      // Step 2: Show success toast first
       toast.success("Connexion réussie!")
       
-      // Step 3: Request notification permission (shows native browser prompt)
       try {
         const userId = response.data?.id
-        
         if (userId) {
-          // Add small delay to ensure page is ready
           await new Promise(resolve => setTimeout(resolve, 100))
-          
-          console.log('[Login] Setting up notifications for user:', userId)
           const fcmToken = await setupNotifications(userId)
-          
           if (fcmToken) {
             toast.success("Notifications activées!")
-            console.log('[Login] FCM Token registered:', fcmToken.substring(0, 20) + '...')
-          } else {
-            console.log('[Login] No FCM token - permission might be denied or not granted')
           }
         }
       } catch (fcmError) {
-        // Non-critical error - don't block login
         console.error('[Login] Error setting up notifications:', fcmError)
       }
       
-      // Step 4: Redirect to dashboard
-      // Wait a bit more to ensure notification prompt completes if shown
       await new Promise(resolve => setTimeout(resolve, 300))
       router.push("/dashboard")
     } catch (error) {
-      // Error is handled by api interceptor
       console.error("Login error:", error)
     } finally {
       setIsLoading(false)
@@ -182,7 +159,6 @@ export default function LoginPage() {
         confirm_new_password: data.confirm_new_password,
       })
       toast.success("Mot de passe réinitialisé avec succès")
-      // Reset forgot password states
       setIsForgotPassword(false)
       setForgotPasswordStep(1)
       setForgotPasswordEmail("")
@@ -200,199 +176,211 @@ export default function LoginPage() {
   const renderForgotPasswordForm = () => {
     if (forgotPasswordStep === 1) {
       return (
-        <form onSubmit={forgotPasswordEmailForm.handleSubmit(handleForgotPasswordEmailSubmit)} className="space-y-5 sm:space-y-6">
+        <form onSubmit={forgotPasswordEmailForm.handleSubmit(handleForgotPasswordEmailSubmit)} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="forgot_email" className="text-sm font-semibold">Email</Label>
-            <Input
-              id="forgot_email"
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Adresse email
+            </label>
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <Mail className="w-5 h-5" />
+              </div>
+              <input
               type="email"
-              placeholder="exemple@email.com"
+                placeholder="votre@email.com"
               {...forgotPasswordEmailForm.register("email")}
               disabled={isForgotPasswordLoading}
-              className="h-12 text-base border-2 focus:border-primary transition-colors"
+                className="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200"
             />
+            </div>
             {forgotPasswordEmailForm.formState.errors.email && (
-              <p className="text-xs text-destructive mt-1">
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                <span className="w-1 h-1 rounded-full bg-red-500" />
                 {forgotPasswordEmailForm.formState.errors.email.message}
               </p>
             )}
           </div>
 
-          <Button
+          <button
             type="submit"
-            className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all"
             disabled={isForgotPasswordLoading}
+            className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#0077FF] to-[#3FA9FF] text-white font-semibold text-base shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
           >
             {isForgotPasswordLoading ? (
               <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
                 Envoi en cours...
               </>
             ) : (
-              "Envoyer le code OTP"
+              <>
+                Envoyer le code
+                <ArrowRight className="w-5 h-5" />
+              </>
             )}
-          </Button>
+          </button>
 
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            className="w-full"
             onClick={() => {
               setIsForgotPassword(false)
               setForgotPasswordStep(1)
               forgotPasswordEmailForm.reset()
             }}
             disabled={isForgotPasswordLoading}
+            className="w-full h-12 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 flex items-center justify-center gap-2"
           >
+            <ArrowLeft className="w-4 h-4" />
             Retour à la connexion
-          </Button>
+          </button>
         </form>
       )
     }
 
     if (forgotPasswordStep === 2) {
       return (
-        <form onSubmit={forgotPasswordOtpForm.handleSubmit(handleForgotPasswordOtpSubmit)} className="space-y-5 sm:space-y-6">
+        <form onSubmit={forgotPasswordOtpForm.handleSubmit(handleForgotPasswordOtpSubmit)} className="space-y-6">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[#3FA9FF]/20 to-[#0077FF]/20 flex items-center justify-center">
+              <Mail className="w-8 h-8 text-[#3FA9FF]" />
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Un code a été envoyé à <span className="font-medium text-slate-700 dark:text-slate-300">{forgotPasswordEmail}</span>
+            </p>
+          </div>
+          
           <div className="space-y-2">
-            <Label htmlFor="otp" className="text-sm font-semibold">Code OTP</Label>
-            <Input
-              id="otp"
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Code OTP
+            </label>
+            <input
               type="text"
-              placeholder="Entrez le code reçu par email"
+              placeholder="Entrez le code à 6 chiffres"
               {...forgotPasswordOtpForm.register("otp")}
               disabled={isForgotPasswordLoading}
-              className="h-12 text-base border-2 focus:border-primary transition-colors"
+              className="w-full h-14 px-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-center text-xl tracking-[0.5em] font-mono placeholder:text-slate-400 placeholder:tracking-normal placeholder:text-base focus:border-[#3FA9FF] focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200"
             />
             {forgotPasswordOtpForm.formState.errors.otp && (
-              <p className="text-xs text-destructive mt-1">
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                <span className="w-1 h-1 rounded-full bg-red-500" />
                 {forgotPasswordOtpForm.formState.errors.otp.message}
               </p>
             )}
           </div>
 
-          <Button
+          <button
             type="submit"
-            className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all"
             disabled={isForgotPasswordLoading}
+            className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#0077FF] to-[#3FA9FF] text-white font-semibold text-base shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
           >
             {isForgotPasswordLoading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Vérification...
-              </>
+              <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
-              "Vérifier le code"
+              <>
+                Vérifier
+                <ArrowRight className="w-5 h-5" />
+              </>
             )}
-          </Button>
+          </button>
 
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            className="w-full"
             onClick={() => setForgotPasswordStep(1)}
             disabled={isForgotPasswordLoading}
+            className="w-full h-12 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 flex items-center justify-center gap-2"
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="w-4 h-4" />
             Retour
-          </Button>
+          </button>
         </form>
       )
     }
 
     if (forgotPasswordStep === 3) {
       return (
-        <form onSubmit={forgotPasswordNewPasswordForm.handleSubmit(handleForgotPasswordNewPasswordSubmit)} className="space-y-5 sm:space-y-6">
+        <form onSubmit={forgotPasswordNewPasswordForm.handleSubmit(handleForgotPasswordNewPasswordSubmit)} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="new_password" className="text-sm font-semibold">Nouveau mot de passe</Label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Nouveau mot de passe
+            </label>
             <div className="relative">
-              <Input
-                id="new_password"
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <Lock className="w-5 h-5" />
+              </div>
+              <input
                 type={showNewPassword ? "text" : "password"}
                 placeholder="••••••••"
                 {...forgotPasswordNewPasswordForm.register("new_password")}
                 disabled={isForgotPasswordLoading}
-                className="h-12 text-base border-2 focus:border-primary transition-colors pr-12"
+                className="w-full h-14 pl-12 pr-14 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200"
               />
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-0 h-12 w-12 hover:bg-transparent"
                 onClick={() => setShowNewPassword(!showNewPassword)}
-                disabled={isForgotPasswordLoading}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1"
               >
-                {showNewPassword ? (
-                  <EyeOff className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                  <Eye className="h-5 w-5 text-muted-foreground" />
-                )}
-              </Button>
+                {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
             {forgotPasswordNewPasswordForm.formState.errors.new_password && (
-              <p className="text-xs text-destructive mt-1">
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                <span className="w-1 h-1 rounded-full bg-red-500" />
                 {forgotPasswordNewPasswordForm.formState.errors.new_password.message}
               </p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirm_new_password" className="text-sm font-semibold">Confirmer le nouveau mot de passe</Label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Confirmer le mot de passe
+            </label>
             <div className="relative">
-              <Input
-                id="confirm_new_password"
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <Lock className="w-5 h-5" />
+              </div>
+              <input
                 type={showConfirmNewPassword ? "text" : "password"}
                 placeholder="••••••••"
                 {...forgotPasswordNewPasswordForm.register("confirm_new_password")}
                 disabled={isForgotPasswordLoading}
-                className="h-12 text-base border-2 focus:border-primary transition-colors pr-12"
+                className="w-full h-14 pl-12 pr-14 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200"
               />
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-0 h-12 w-12 hover:bg-transparent"
                 onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
-                disabled={isForgotPasswordLoading}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1"
               >
-                {showConfirmNewPassword ? (
-                  <EyeOff className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                  <Eye className="h-5 w-5 text-muted-foreground" />
-                )}
-              </Button>
+                {showConfirmNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
             {forgotPasswordNewPasswordForm.formState.errors.confirm_new_password && (
-              <p className="text-xs text-destructive mt-1">
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                <span className="w-1 h-1 rounded-full bg-red-500" />
                 {forgotPasswordNewPasswordForm.formState.errors.confirm_new_password.message}
               </p>
             )}
           </div>
 
-          <Button
+          <button
             type="submit"
-            className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all"
             disabled={isForgotPasswordLoading}
+            className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#0077FF] to-[#3FA9FF] text-white font-semibold text-base shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
           >
             {isForgotPasswordLoading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Réinitialisation...
-              </>
+              <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               "Réinitialiser le mot de passe"
             )}
-          </Button>
+          </button>
 
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            className="w-full"
             onClick={() => setForgotPasswordStep(2)}
             disabled={isForgotPasswordLoading}
+            className="w-full h-12 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 flex items-center justify-center gap-2"
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="w-4 h-4" />
             Retour
-          </Button>
+          </button>
         </form>
       )
     }
@@ -402,135 +390,169 @@ export default function LoginPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-border/50 shadow-xl overflow-hidden">
-        <CardHeader className="space-y-2 px-6 sm:px-8 pt-8 sm:pt-10 pb-6 bg-gradient-to-br from-primary/5 to-primary/10">
-          <CardTitle className="text-2xl sm:text-3xl font-bold text-center">
-            {isForgotPassword ? "Réinitialisation du mot de passe" : "Connexion"}
-          </CardTitle>
-          <CardDescription className="text-center text-sm sm:text-base">
+      {/* Card */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-800 overflow-hidden">
+        {/* Header */}
+        <div className="px-6 sm:px-8 pt-8 pb-6">
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+            {isForgotPassword ? "Mot de passe oublié" : "Connexion"}
+          </h2>
+          <p className="mt-2 text-slate-500 dark:text-slate-400">
             {isForgotPassword
               ? forgotPasswordStep === 1
-                ? "Entrez votre email pour recevoir un code de vérification"
+                ? "Entrez votre email pour recevoir un code"
                 : forgotPasswordStep === 2
-                ? "Entrez le code OTP reçu par email"
-                : "Entrez votre nouveau mot de passe"
-              : "Entrez vos identifiants pour accéder à votre compte"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-6 sm:px-8 pb-6 sm:pb-8 pt-6">
+                ? "Vérifiez votre email"
+                : "Créez un nouveau mot de passe"
+                : " "
+            }
+          </p>
+        </div>
+
+        {/* Form */}
+        <div className="px-6 sm:px-8 pb-8">
           {isForgotPassword ? (
             renderForgotPasswordForm()
           ) : (
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 sm:space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              {/* Email/Phone Field */}
               <div className="space-y-2">
-                <Label htmlFor="email_or_phone" className="text-sm font-semibold">Email ou Téléphone</Label>
-                <Input
-                  id="email_or_phone"
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Email ou Téléphone
+                </label>
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <input
                   type="text"
-                  placeholder="exemple@email.com ou +225..."
+                    placeholder="votre@email.com ou +225..."
                   {...register("email_or_phone")}
                   disabled={isLoading}
-                  className="h-12 text-base border-2 focus:border-primary transition-colors"
+                    className="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200"
                 />
-                {errors.email_or_phone && <p className="text-xs text-destructive mt-1">{errors.email_or_phone.message}</p>}
+                </div>
+                {errors.email_or_phone && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-red-500" />
+                    {errors.email_or_phone.message}
+                  </p>
+                )}
               </div>
 
+              {/* Password Field */}
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-semibold">Mot de passe</Label>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Mot de passe
+                </label>
                 <div className="relative">
-                  <Input
-                    id="password"
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <input
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     {...register("password")}
                     disabled={isLoading}
-                    className="h-12 text-base border-2 focus:border-primary transition-colors pr-12"
+                    className="w-full h-14 pl-12 pr-14 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200"
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-12 w-12 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1"
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </Button>
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
-                {errors.password && <p className="text-xs text-destructive mt-1">{errors.password.message}</p>}
+                {errors.password && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-red-500" />
+                    {errors.password.message}
+                  </p>
+                )}
               </div>
 
+              {/* Remember Me & Forgot Password */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="remember_me"
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
                     checked={rememberMe}
-                    onCheckedChange={(checked) => setRememberMe(checked === true)}
+                      onChange={(e) => setRememberMe(e.target.checked)}
                     disabled={isLoading}
+                      className="peer sr-only"
                   />
-                  <Label
-                    htmlFor="remember_me"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
+                    <div className="w-5 h-5 rounded-lg border-2 border-slate-300 dark:border-slate-600 peer-checked:border-[#3FA9FF] peer-checked:bg-[#3FA9FF] transition-all duration-200 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <span className="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
                     Se souvenir de moi
-                  </Label>
-                </div>
+                  </span>
+                </label>
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsForgotPassword(true)
-                    setForgotPasswordStep(1)
-                  }}
-                  className="text-sm text-primary hover:underline font-semibold"
+                  onClick={() => setIsForgotPassword(true)}
                   disabled={isLoading}
+                  className="text-sm font-medium text-[#3FA9FF] hover:text-[#0077FF] transition-colors"
                 >
                   Mot de passe oublié?
                 </button>
               </div>
 
-              <Button type="submit" className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all" disabled={isLoading}>
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#0077FF] to-[#3FA9FF] text-white font-semibold text-base shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+              >
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                     Connexion en cours...
                   </>
                 ) : (
-                  "Se connecter"
+                  <>
+                    Se connecter
+                    <ArrowRight className="w-5 h-5" />
+                  </>
                 )}
-              </Button>
+              </button>
             </form>
           )}
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-3 px-6 sm:px-8 pb-8">
+        </div>
+
+        {/* Footer */}
           {!isForgotPassword && (
-            <div className="text-sm text-muted-foreground text-center">
+          <div className="px-6 sm:px-8 py-5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
+            <p className="text-center text-slate-600 dark:text-slate-400">
               Pas encore de compte?{" "}
-              <Link href="/signup" className="text-primary hover:underline font-semibold">
+              <Link href="/signup" className="font-semibold text-[#3FA9FF] hover:text-[#0077FF] transition-colors">
                 Créer un compte
               </Link>
+            </p>
             </div>
           )}
-        </CardFooter>
-      </Card>
+      </div>
 
-      <Card className="border-border/50 shadow-md">
-        <CardContent className="p-6">
-          <Button
-            asChild
-            variant="outline"
-            className="w-full h-12 text-base font-medium flex items-center justify-center gap-2 border-2 hover:bg-muted/50 transition-all"
-          >
-            <a href={APK_DOWNLOAD_URL} download={APK_FILE_NAME} className="flex items-center gap-2">
-              <Download className="h-5 w-5" />
-              Télécharger l'application mobile
-            </a>
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Download App */}
+      <a
+        href={APK_DOWNLOAD_URL}
+        download={APK_FILE_NAME}
+        className="bg-slate-800/80 dark:bg-slate-800/50 rounded-xl p-3 flex items-center gap-3 hover:bg-slate-700/80 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+      >
+        <div className="w-8 h-8 rounded-lg bg-[#3FA9FF]/20 flex items-center justify-center flex-shrink-0">
+          <Download className="w-4 h-4 text-[#3FA9FF]" />
+        </div>
+        <p className="flex-1 text-sm text-slate-300">Télécharger l'app</p>
+        <span className="px-3 py-1.5 rounded-lg bg-[#3FA9FF] text-white text-xs font-medium">
+          APK
+        </span>
+      </a>
     </div>
   )
 }

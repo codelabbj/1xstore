@@ -2,29 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { ArrowDownToLine, ArrowUpFromLine, Wallet, Loader2, ArrowRight, RefreshCw, MessageSquare, Send, Download, Ticket, Headphones } from "lucide-react"
+import { ArrowDownToLine, ArrowUpFromLine, Wallet, Loader2, Send, Download, Ticket, MessageCircleMore, Clock, CheckCircle2, XCircle, AlertCircle, ChevronRight, Gift } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { transactionApi, advertisementApi } from "@/lib/api-client"
+import { transactionApi, advertisementApi, settingsApi } from "@/lib/api-client"
 import type { Transaction, Advertisement } from "@/lib/types"
 import { toast } from "react-hot-toast"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { formatPhoneNumberForDisplay } from "@/lib/utils"
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  type CarouselApi,
-} from "@/components/ui/carousel"
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -32,39 +18,26 @@ export default function DashboardPage() {
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true)
   const [advertisements, setAdvertisements] = useState<Advertisement[]>([])
   const [isLoadingAd, setIsLoadingAd] = useState(true)
-  const [adImageErrors, setAdImageErrors] = useState<Set<string>>(new Set())
-  const [isChatPopoverOpen, setIsChatPopoverOpen] = useState(false)
-  const [carouselApi, setCarouselApi] = useState<CarouselApi>()
-  const [isCarouselPaused, setIsCarouselPaused] = useState(false)
+  const [currentAdIndex, setCurrentAdIndex] = useState(0)
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [referralBonusEnabled, setReferralBonusEnabled] = useState(false)
 
-  // Prevent browser back button from going to login
   useEffect(() => {
-    // Replace current history entry to prevent going back
     window.history.replaceState(null, "", window.location.href)
-    
-    const handlePopState = (event: PopStateEvent) => {
-      // Push current state again to prevent navigation
+    const handlePopState = () => {
       window.history.pushState(null, "", window.location.href)
     }
-
     window.addEventListener("popstate", handlePopState)
-    
-    return () => {
-      window.removeEventListener("popstate", handlePopState)
-    }
+    return () => window.removeEventListener("popstate", handlePopState)
   }, [])
 
   const fetchRecentTransactions = async () => {
     try {
       setIsLoadingTransactions(true)
-      const data = await transactionApi.getHistory({
-        page: 1,
-        page_size: 5, // Get only the 5 most recent transactions
-      })
+      const data = await transactionApi.getHistory({ page: 1, page_size: 5 })
       setRecentTransactions(data.results)
     } catch (error) {
       console.error("Error fetching recent transactions:", error)
-      toast.error("Erreur lors du chargement des transactions récentes")
     } finally {
       setIsLoadingTransactions(false)
     }
@@ -74,23 +47,26 @@ export default function DashboardPage() {
     try {
       setIsLoadingAd(true)
       const response = await advertisementApi.get()
-      // The API returns a paginated response with results array
-      if (response && response.results && Array.isArray(response.results)) {
-        // Get all advertisements where enable is true and have an image
+      if (response?.results && Array.isArray(response.results)) {
         const enabledAds = response.results.filter(
           (ad: Advertisement) => ad.enable === true && (ad.image || ad.image_url)
         )
         setAdvertisements(enabledAds)
-      } else {
-        // Empty or invalid response - show placeholder
-        setAdvertisements([])
       }
     } catch (error) {
       console.error("Error fetching advertisement:", error)
-      // On error, show placeholder
-      setAdvertisements([])
     } finally {
       setIsLoadingAd(false)
+    }
+  }
+
+  const fetchSettings = async () => {
+    try {
+      const settings = await settingsApi.get()
+      setReferralBonusEnabled(settings?.referral_bonus === true)
+    } catch (error) {
+      console.error("Error fetching settings:", error)
+      setReferralBonusEnabled(false)
     }
   }
 
@@ -98,395 +74,289 @@ export default function DashboardPage() {
     if (user) {
       fetchRecentTransactions()
       fetchAdvertisement()
+      fetchSettings()
     }
   }, [user])
 
-  // Refetch data when the page gains focus
   useEffect(() => {
-    const handleFocus = () => {
-      if (user) {
-        fetchRecentTransactions()
-      }
-    }
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [user])
-
-  const getAdvertisementImageUrl = (ad: Advertisement) => {
-    return ad.image_url || ad.image || null
-  }
-
-  const getAdvertisementLink = (ad: Advertisement) => {
-    return ad.url || ad.link || null
-  }
-
-  const handleAdImageError = (adId: string) => {
-    setAdImageErrors(prev => new Set(prev).add(adId))
-  }
-
-  // Auto-play carousel
-  useEffect(() => {
-    if (!carouselApi || advertisements.length <= 1 || isCarouselPaused) return
-
+    if (advertisements.length <= 1) return
     const interval = setInterval(() => {
-      carouselApi.scrollNext()
-    }, 5000) // Change slide every 5 seconds
-
+      setCurrentAdIndex((prev) => (prev + 1) % advertisements.length)
+    }, 5000)
     return () => clearInterval(interval)
-  }, [carouselApi, advertisements.length, isCarouselPaused])
+  }, [advertisements.length])
 
-  const getStatusBadge = (status: Transaction["status"]) => {
-    const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      pending: { variant: "secondary", label: "En attente" },
-      accept: { variant: "default", label: "Accepté" },
-      init_payment: { variant: "secondary", label: "En attente" },
-      error: { variant: "destructive", label: "Erreur" },
-      reject: { variant: "destructive", label: "Rejeté" },
-      timeout: { variant: "outline", label: "Expiré" },
+  const getStatusConfig = (status: Transaction["status"]) => {
+    const configs: Record<string, { icon: any; color: string; bg: string; label: string }> = {
+      pending: { icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", label: "En attente" },
+      accept: { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Accepté" },
+      init_payment: { icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", label: "En attente" },
+      error: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", label: "Erreur" },
+      reject: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", label: "Rejeté" },
+      timeout: { icon: AlertCircle, color: "text-slate-500", bg: "bg-slate-500/10", label: "Expiré" },
     }
-    
-    const config = statusConfig[status] || { variant: "outline" as const, label: status }
-    return <Badge variant={config.variant}>{config.label}</Badge>
+    return configs[status] || configs.timeout
   }
 
-  const getTypeBadge = (type: Transaction["type_trans"]) => {
-    return (
-      <Badge variant={type === "deposit" ? "default" : "secondary"}>
-        {type === "deposit" ? "Dépôt" : "Retrait"}
-      </Badge>
-    )
-  }
+  const currentAd = advertisements[currentAdIndex]
 
   return (
-    <>
-      <div className="space-y-8">
-      {/* Hero Section with Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Welcome Card - Takes 2 columns on large screens */}
-        <div className="lg:col-span-2">
-          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary via-primary/95 to-primary/90 p-5 sm:p-8 lg:p-10 text-primary-foreground shadow-2xl">
-            <div className="relative z-10">
-              <p className="text-xs sm:text-sm lg:text-base opacity-90 mb-1.5 sm:mb-2">Bonjour,</p>
-              <h1 className="text-xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2 sm:mb-4 leading-tight">
-                {user?.first_name} {user?.last_name}
-              </h1>
-              <p className="text-xs sm:text-base lg:text-lg opacity-80 mb-4 sm:mb-6">Gérez vos transactions en toute simplicité</p>
-              
-              {/* Quick Actions in Hero */}
-              <div className="flex gap-1.5 sm:gap-2 md:gap-3 mt-4 sm:mt-6">
-                <Link href="/dashboard/deposit" className="flex-1 min-w-0">
-                  <div className="group flex items-center justify-center gap-1 sm:gap-2 md:gap-3 px-2 sm:px-3 md:px-5 py-1.5 sm:py-2 md:py-3 rounded-md sm:rounded-lg md:rounded-xl bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all cursor-pointer border border-white/20">
-                    <div className="p-1 sm:p-1.5 md:p-2 rounded-md sm:rounded-lg bg-white/30 flex-shrink-0">
-                      <ArrowDownToLine className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
-                    </div>
-                    <span className="font-semibold text-[10px] sm:text-xs md:text-sm lg:text-base truncate">Dépôt</span>
-                  </div>
-                </Link>
-                <Link href="/dashboard/withdrawal" className="flex-1 min-w-0">
-                  <div className="group flex items-center justify-center gap-1 sm:gap-2 md:gap-3 px-2 sm:px-3 md:px-5 py-1.5 sm:py-2 md:py-3 rounded-md sm:rounded-lg md:rounded-xl bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all cursor-pointer border border-white/20">
-                    <div className="p-1 sm:p-1.5 md:p-2 rounded-md sm:rounded-lg bg-white/30 flex-shrink-0">
-                      <ArrowUpFromLine className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
-                    </div>
-                    <span className="font-semibold text-[10px] sm:text-xs md:text-sm lg:text-base truncate">Retrait</span>
-                  </div>
-                </Link>
-                <Link href="/dashboard/coupon" className="flex-1 min-w-0">
-                  <div className="group flex items-center justify-center gap-1 sm:gap-2 md:gap-3 px-2 sm:px-3 md:px-5 py-1.5 sm:py-2 md:py-3 rounded-md sm:rounded-lg md:rounded-xl bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all cursor-pointer border border-white/20">
-                    <div className="p-1 sm:p-1.5 md:p-2 rounded-md sm:rounded-lg bg-white/30 flex-shrink-0">
-                      <Ticket className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
-                    </div>
-                    <span className="font-semibold text-[10px] sm:text-xs md:text-sm lg:text-base truncate">Coupon</span>
-                  </div>
-                </Link>
+    <div className="space-y-6">
+      {/* Welcome Section - Compact */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Bonjour 👋</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
+            {user?.first_name} {user?.last_name}
+          </h1>
+        </div>
+      </div>
+
+      {/* Advertisement Banner */}
+      {!isLoadingAd && (currentAd || advertisements.length === 0) && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0066FF] to-[#3FA9FF] aspect-[3/1]">
+          {currentAd ? (
+            <>
+              <Image
+                src={currentAd.image_url || currentAd.image || ""}
+                alt={currentAd.title || "Publicité"}
+                fill
+                className="object-cover"
+              />
+              {(currentAd.url || currentAd.link) && (
+                <a
+                  href={currentAd.url || currentAd.link || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute inset-0"
+                />
+              )}
+              {advertisements.length > 1 && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                  {advertisements.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentAdIndex(idx)}
+                      className={`w-2 h-2 rounded-full transition-all ${idx === currentAdIndex ? 'bg-white w-5' : 'bg-white/50'}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center text-white">
+                <Wallet className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                <p className="font-medium opacity-80">Espace publicitaire</p>
               </div>
             </div>
-            {/* Decorative elements */}
-            <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-white/5 rounded-full -mr-24 -mt-24 sm:-mr-32 sm:-mt-32 blur-3xl"></div>
-            <div className="absolute bottom-0 left-0 w-36 h-36 sm:w-48 sm:h-48 bg-white/5 rounded-full -ml-18 -mb-18 sm:-ml-24 sm:-mb-24 blur-3xl"></div>
-          </div>
+          )}
         </div>
+      )}
 
-        {/* Advertisement Section with Download Button - Takes 1 column */}
-        <div className="lg:col-span-1 flex">
-          <div className="relative w-full flex flex-col rounded-2xl sm:rounded-3xl border-2 border-muted-foreground/20 hover:border-primary/30 transition-all duration-300 shadow-lg hover:shadow-xl overflow-hidden bg-background">
-          {isLoadingAd ? (
-              <div className="relative w-full min-h-[200px] sm:min-h-[250px] lg:min-h-[300px] bg-muted/20 flex items-center justify-center flex-1">
-                <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
-              </div>
-            ) : advertisements.length > 0 ? (
-              <>
-                <div className="relative w-full flex-shrink-0">
-              <Carousel
-                setApi={setCarouselApi}
-                opts={{
-                  align: "start",
-                  loop: true,
-                }}
-                className="w-full"
-                onTouchStart={() => setIsCarouselPaused(true)}
-                onTouchEnd={() => setIsCarouselPaused(false)}
-                onMouseEnter={() => setIsCarouselPaused(true)}
-                onMouseLeave={() => setIsCarouselPaused(false)}
-              >
-                <CarouselContent className="-ml-0">
-                  {advertisements.map((ad) => {
-                    const imageUrl = getAdvertisementImageUrl(ad)
-                    const link = getAdvertisementLink(ad)
-                    const adId = ad.id?.toString() || ""
-                    const hasError = adImageErrors.has(adId)
-                    
-                    if (!imageUrl || hasError) return null
-                    
-                    return (
-                          <CarouselItem key={adId} className="pl-0 basis-full">
-                            <div className="relative w-full">
-                          <Image
-                            src={imageUrl}
-                            alt={ad.title || "Publicité"}
-                                width={0}
-                                height={0}
-                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                className={link ? "w-full h-auto cursor-pointer" : "w-full h-auto"}
-                            onError={() => handleAdImageError(adId)}
-                                priority={false}
-                          />
-                          {link && (
-                            <a
-                              href={link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="absolute inset-0 z-10"
-                              aria-label={ad.title || "Voir la publicité"}
-                            />
-                          )}
-                        </div>
-                      </CarouselItem>
-                    )
-                  })}
-                </CarouselContent>
-              </Carousel>
-                </div>
-                {/* Download Button integrated */}
-                <div className="p-4 sm:p-5 border-t border-muted-foreground/20 bg-muted/5">
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="w-full h-11 sm:h-12 text-sm sm:text-base font-medium flex items-center justify-center gap-2 border-2 hover:bg-primary hover:text-primary-foreground transition-all"
-                  >
-                    {/* <a href="/app-v1.0.5.apk" download="Africash-v1.0.5.apk" className="flex items-center gap-2"> */}
-                    <a href="" download="" className="flex items-center gap-2">
-                      <Download className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="hidden sm:inline">Télécharger l'application mobile</span>
-                      <span className="sm:hidden">Télécharger l'app</span>
-                    </a>
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="relative w-full flex flex-col flex-1">
-                <div className="relative w-full min-h-[200px] sm:min-h-[250px] lg:min-h-[300px] bg-gradient-to-br from-muted/30 to-muted/10 flex items-center justify-center border-b border-muted-foreground/20 flex-1">
-                  <div className="text-center p-4 sm:p-6">
-                    <p className="text-sm sm:text-base lg:text-lg text-muted-foreground font-semibold">Espace publicitaire</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground/70 mt-1.5">Publicité</p>
-                  </div>
-                </div>
-                {/* Download Button integrated */}
-                <div className="p-4 sm:p-5 border-t border-muted-foreground/20 bg-muted/5">
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="w-full h-11 sm:h-12 text-sm sm:text-base font-medium flex items-center justify-center gap-2 border-2 hover:bg-primary hover:text-primary-foreground transition-all"
-                  >
-                    <a href="/app-v1.0.5.apk" download="Africash-v1.0.5.apk" className="flex items-center gap-2">
-                      <Download className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="hidden sm:inline">Télécharger l'application mobile</span>
-                      <span className="sm:hidden">Télécharger l'app</span>
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            )}
+      {/* Quick Actions - Cards */}
+      <div className={`grid gap-2 sm:gap-4 ${referralBonusEnabled ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <Link href="/dashboard/deposit" className="group">
+          <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl p-2.5 sm:p-5 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10 transition-all h-full flex flex-col items-center sm:items-start">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center mb-1.5 sm:mb-3 group-hover:scale-110 transition-transform shadow-lg shadow-emerald-500/20">
+              <ArrowDownToLine className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+            </div>
+            <p className="font-semibold text-slate-900 dark:text-white text-[11px] sm:text-base text-center sm:text-left">Dépôt</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 hidden sm:block">Recharger</p>
           </div>
-          </div>
-        </div>
+        </Link>
 
-      {/* Recent Activity - Clean Professional Design */}
-      <div className="space-y-4 sm:space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-semibold">Activité récente</h2>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Vos dernières transactions</p>
+        <Link href="/dashboard/withdrawal" className="group">
+          <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl p-2.5 sm:p-5 border border-slate-200 dark:border-slate-800 hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/10 transition-all h-full flex flex-col items-center sm:items-start">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mb-1.5 sm:mb-3 group-hover:scale-110 transition-transform shadow-lg shadow-amber-500/20">
+              <ArrowUpFromLine className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+            </div>
+            <p className="font-semibold text-slate-900 dark:text-white text-[11px] sm:text-base text-center sm:text-left">Retrait</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 hidden sm:block">Récupérer</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={fetchRecentTransactions}
-              disabled={isLoadingTransactions}
-              className="h-8 w-8 sm:h-9 sm:w-9"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
-            </Button>
-            <Button asChild variant="ghost" size="sm" className="h-8 sm:h-9 text-xs sm:text-sm">
-              <Link href="/dashboard/history" className="flex items-center gap-1.5 sm:gap-2">
-                <span className="hidden sm:inline">Voir tout</span>
-                <span className="sm:hidden">Tout</span>
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
+        </Link>
+
+        <Link href="/dashboard/coupon" className="group">
+          <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl p-2.5 sm:p-5 border border-slate-200 dark:border-slate-800 hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-500/10 transition-all h-full flex flex-col items-center sm:items-start">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-2xl bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center mb-1.5 sm:mb-3 group-hover:scale-110 transition-transform shadow-lg shadow-amber-500/20">
+              <Ticket className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+            </div>
+            <p className="font-semibold text-slate-900 dark:text-white text-[11px] sm:text-base text-center sm:text-left">Coupon</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 hidden sm:block">Code promo</p>
           </div>
-        </div>
-        
-        {isLoadingTransactions ? (
-          <div className="flex items-center justify-center py-12 sm:py-16 rounded-lg border border-border">
-            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
-          </div>
-        ) : recentTransactions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 sm:py-16 rounded-lg border border-border bg-muted/30">
-            <Wallet className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 opacity-50" />
-            <p className="text-sm sm:text-base text-muted-foreground text-center font-medium">Aucune transaction récente</p>
-            <p className="text-xs sm:text-sm text-muted-foreground text-center mt-1">Vos transactions apparaîtront ici</p>
-          </div>
-        ) : (
-          <div className="space-y-1.5 sm:space-y-2">
-            {recentTransactions.map((transaction) => (
-              <Card 
-                key={transaction.id} 
-                className="group border border-border hover:border-border/80 transition-colors duration-150 bg-card"
-              >
-                <CardContent className="p-3 sm:p-4">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    {/* Icon */}
-                    <div className={`p-2 rounded-lg flex-shrink-0 ${
-                            transaction.type_trans === "deposit" 
-                        ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400" 
-                        : "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400"
-                          }`}>
-                            {transaction.type_trans === "deposit" ? (
-                        <ArrowDownToLine className="h-4 w-4 sm:h-5 sm:w-5" />
-                            ) : (
-                        <ArrowUpFromLine className="h-4 w-4 sm:h-5 sm:w-5" />
-                            )}
-                          </div>
-                    
-                    {/* Main Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-                        {/* Left: Details */}
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm sm:text-base text-foreground">
-                              #{transaction.reference}
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              {getTypeBadge(transaction.type_trans)}
-                              {getStatusBadge(transaction.status)}
-                            </div>
-                          </div>
-                          <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                            {transaction.app_details?.name || transaction.app}
-                          </p>
-                          <p className="text-[11px] sm:text-xs text-muted-foreground">
-                            {transaction.user_app_id && (
-                              <span className="font-mono">ID pari: {transaction.user_app_id}</span>
-                            )}
-                            {transaction.user_app_id && transaction.phone_number && <span className="mx-1.5">•</span>}
-                            {transaction.phone_number && (
-                              <span>{formatPhoneNumberForDisplay(transaction.phone_number)}</span>
-                            )}
-                            {(transaction.user_app_id || transaction.phone_number) && (
-                              <span className="mx-1.5">•</span>
-                            )}
-                            <span>{format(new Date(transaction.created_at), "dd MMM yyyy, HH:mm", { locale: fr })}</span>
-                          </p>
-                        </div>
-                        
-                        {/* Right: Amount */}
-                        <div className="flex-shrink-0 text-right">
-                          <p className={`text-base sm:text-lg font-semibold ${
-                            transaction.type_trans === "deposit" 
-                              ? "text-emerald-600 dark:text-emerald-400" 
-                              : "text-orange-600 dark:text-orange-400"
-                          }`}>
-                            {transaction.type_trans === "deposit" ? "+" : "−"}
-                            {transaction.amount.toLocaleString("fr-FR", {
-                              style: "currency",
-                              currency: "XOF",
-                              minimumFractionDigits: 0,
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-              ))}
-          </div>
+        </Link>
+
+        {referralBonusEnabled && (
+          <Link href="/dashboard/bonus" className="group">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl p-2.5 sm:p-5 border border-slate-200 dark:border-slate-800 hover:border-pink-500/50 hover:shadow-lg hover:shadow-pink-500/10 transition-all h-full flex flex-col items-center sm:items-start">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-2xl bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center mb-1.5 sm:mb-3 group-hover:scale-110 transition-transform shadow-lg shadow-pink-500/20">
+                <Gift className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+              </div>
+              <p className="font-semibold text-slate-900 dark:text-white text-[11px] sm:text-base text-center sm:text-left">Bonus</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 hidden sm:block">Parrainage</p>
+            </div>
+          </Link>
         )}
       </div>
-      </div>
-      
-      <Popover open={isChatPopoverOpen} onOpenChange={setIsChatPopoverOpen}>
-        <PopoverTrigger asChild>
-        <Button
-          className="fixed right-4 bottom-24 sm:bottom-10 sm:right-8 h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary border border-primary/20"
-          aria-label="Support client"
-        >
-          <Headphones className="h-5 w-5 sm:h-6 sm:w-6" />
-          <span className="sr-only">Support client</span>
-        </Button>
-        </PopoverTrigger>
-        <PopoverContent 
-        className="w-56 p-2 mb-2 mr-2" 
-        align="end"
-        side="top"
-      >
-        <div className="space-y-1">
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-3 h-auto py-3"
-            onClick={() => {
-              // Replace with your WhatsApp number (format: country code + number without + or spaces)
-              window.open("https://wa.me/message/234000000000 ", "_blank")
-              setIsChatPopoverOpen(false)
-            }}
+
+      {/* Recent Transactions */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+            Transactions récentes
+          </h2>
+          <Link
+            href="/dashboard/history"
+            className="flex items-center gap-1 text-sm font-medium text-[#3FA9FF] hover:text-[#0066FF] transition-colors"
           >
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#25D366] text-white">
-              <svg
-                className="h-5 w-5"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-              </svg>
-            </div>
-            <div className="flex flex-col items-start">
-              <span className="font-medium text-sm">WhatsApp</span>
-              <span className="text-xs text-muted-foreground">Chat sur WhatsApp</span>
-            </div>
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-3 h-auto py-3"
-            onClick={() => {
-              // Replace with your Telegram username
-              window.open("https://t.me/Africash", "_blank")
-              setIsChatPopoverOpen(false)
-            }}
-          >
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-500 text-white">
-              <Send className="h-4 w-4" />
-            </div>
-            <div className="flex flex-col items-start">
-              <span className="font-medium text-sm">Telegram</span>
-              <span className="text-xs text-muted-foreground">Chat sur Telegram</span>
-            </div>
-          </Button>
+            Voir tout
+            <ChevronRight className="w-4 h-4" />
+          </Link>
         </div>
-        </PopoverContent>
-      </Popover>
-    </>
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+          {isLoadingTransactions ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-[#3FA9FF] animate-spin" />
+            </div>
+          ) : recentTransactions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                <Wallet className="w-7 h-7 text-slate-400" />
+              </div>
+              <p className="font-medium text-slate-600 dark:text-slate-300">Aucune transaction</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+                Effectuez votre premier dépôt
+              </p>
+              <Link
+                href="/dashboard/deposit"
+                className="mt-4 px-5 py-2.5 rounded-xl bg-[#3FA9FF] text-white font-medium text-sm hover:bg-[#0066FF] transition-colors"
+              >
+                Faire un dépôt
+              </Link>
+            </div>
+          ) : (
+            <div>
+              {recentTransactions.map((transaction, index) => {
+                const statusConfig = getStatusConfig(transaction.status)
+                const StatusIcon = statusConfig.icon
+                const isDeposit = transaction.type_trans === "deposit"
+                
+                return (
+                  <div 
+                    key={transaction.id}
+                    className={`flex items-center gap-4 p-4 ${
+                      index !== recentTransactions.length - 1 ? 'border-b border-slate-100 dark:border-slate-800' : ''
+                    }`}
+                  >
+                    {/* Icon */}
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      isDeposit ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
+                    }`}>
+                      {isDeposit ? <ArrowDownToLine className="w-5 h-5" /> : <ArrowUpFromLine className="w-5 h-5" />}
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900 dark:text-white text-sm">
+                          {isDeposit ? 'Dépôt' : 'Retrait'}
+                        </span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium ${statusConfig.bg} ${statusConfig.color}`}>
+                          <StatusIcon className="w-3 h-3" />
+                          {statusConfig.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                        {transaction.app_details?.name || transaction.app} • {format(new Date(transaction.created_at), "dd MMM, HH:mm", { locale: fr })}
+                      </p>
+                    </div>
+
+                    {/* Amount */}
+                    <div className="text-right flex-shrink-0">
+                      <p className={`font-bold ${isDeposit ? 'text-emerald-500' : 'text-amber-500'}`}>
+                        {isDeposit ? '+' : '−'}{transaction.amount.toLocaleString()}
+                      </p>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500">FCFA</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Download App */}
+      <a
+        href="/app-v1.0.5.apk"
+        download="1xstore-v1.0.5.apk"
+        className="bg-slate-800/80 dark:bg-slate-800/50 rounded-xl p-3 flex items-center gap-3 hover:bg-slate-700/80 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+      >
+        <div className="w-8 h-8 rounded-lg bg-[#3FA9FF]/20 flex items-center justify-center flex-shrink-0">
+          <Download className="w-4 h-4 text-[#3FA9FF]" />
+        </div>
+        <p className="flex-1 text-sm text-slate-300">Télécharger l'app</p>
+        <span className="px-3 py-1.5 rounded-lg bg-[#3FA9FF] text-white text-xs font-medium">
+          APK
+        </span>
+      </a>
+
+      {/* Floating Support Button */}
+      <div className="fixed right-4 bottom-6 z-40">
+        {isChatOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setIsChatOpen(false)} />
+            <div className="absolute right-0 bottom-full mb-3 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden z-50">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                <p className="font-semibold text-slate-900 dark:text-white text-sm">Support</p>
+              </div>
+              <div className="p-2">
+                <a
+                  href="https://wa.me/message/234000000000"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-[#25D366] flex items-center justify-center text-white">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                  </div>
+                  <span className="font-medium text-slate-700 dark:text-slate-200 text-sm">WhatsApp</span>
+                </a>
+                <a
+                  href="https://t.me/1xstore"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-[#0088cc] flex items-center justify-center text-white">
+                    <Send className="w-5 h-5" />
+                  </div>
+                  <span className="font-medium text-slate-700 dark:text-slate-200 text-sm">Telegram</span>
+                </a>
+              </div>
+            </div>
+          </>
+        )}
+        <button
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all ${
+            isChatOpen 
+              ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300' 
+              : 'bg-[#3FA9FF] text-white shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-105'
+          }`}
+        >
+          {isChatOpen ? (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <MessageCircleMore className="w-6 h-6" />
+          )}
+        </button>
+      </div>
+    </div>
   )
 }

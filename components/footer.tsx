@@ -1,7 +1,7 @@
 export function Footer() {
   return (
-    <footer className="border-t border-border/50 bg-background/50 mt-auto">
-      <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+    <footer className="border-t border-border/40 bg-background/80 backdrop-blur-sm mt-auto">
+      <div className="app-container-wide py-4 sm:py-5">
         <div className="flex items-center justify-center">
           <p className="text-xs sm:text-sm text-muted-foreground text-center">
             Développé par{" "}
@@ -19,4 +19,3 @@ export function Footer() {
     </footer>
   )
 }
-

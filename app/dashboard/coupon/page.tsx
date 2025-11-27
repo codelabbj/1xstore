@@ -2,10 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Loader2, Ticket, Copy, Check, ArrowLeft } from "lucide-react"
+import { Loader2, Ticket, Copy, Check, ChevronLeft } from "lucide-react"
 import Link from "next/link"
 import { couponApi, platformApi } from "@/lib/api-client"
 import type { Coupon, Platform } from "@/lib/types"
@@ -25,11 +22,8 @@ export default function CouponPage() {
     fetchPlatforms()
   }, [])
 
-  // Refetch data when the page gains focus
   useEffect(() => {
-    const handleFocus = () => {
-      fetchCoupons()
-    }
+    const handleFocus = () => fetchCoupons()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [])
@@ -49,8 +43,7 @@ export default function CouponPage() {
       const data = await couponApi.getAll(1)
       setCoupons(data.results)
     } catch (error) {
-      console.error("Error fetching coupons:", error)
-      toast.error("Erreur lors du chargement des coupons")
+      toast.error("Erreur lors du chargement")
     } finally {
       setIsLoading(false)
     }
@@ -58,131 +51,110 @@ export default function CouponPage() {
 
   const getPlatformName = (betAppId: string) => {
     const platform = platforms.find((p) => p.id === betAppId)
-    return platform?.name || "Plateforme inconnue"
+    return platform?.name || "Plateforme"
   }
 
   const copyToClipboard = (code: string) => {
     navigator.clipboard.writeText(code)
     setCopiedCode(code)
-    toast.success("Code copié dans le presse-papiers")
+    toast.success("Code copié!")
     setTimeout(() => setCopiedCode(null), 2000)
   }
 
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">Veuillez vous connecter pour voir vos coupons</p>
+        <p className="text-slate-500">Veuillez vous connecter</p>
       </div>
     )
   }
 
-
   return (
-    <div className="max-w-6xl mx-auto w-full px-3 sm:px-4 lg:px-6">
-      <div className="space-y-4 sm:space-y-5 lg:space-y-6">
-        {/* Header */}
-        <div className="pb-2 border-b border-border/50">
-          <div className="flex items-center gap-3 mb-2">
-            <Button
-              asChild
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 sm:h-9 sm:w-9"
-            >
-              <Link href="/dashboard">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div className="flex items-center gap-2 sm:gap-3 flex-1">
-              <Ticket className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-              <div className="flex-1">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold tracking-tight">Mes Coupons</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                  Gérez vos codes promo et coupons
-                </p>
-              </div>
-            </div>
+    <div className="max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <Link
+          href="/dashboard"
+          className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </Link>
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+            <Ticket className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Mes Coupons</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{coupons.length} coupon(s)</p>
           </div>
         </div>
+      </div>
 
-        {/* Loading State */}
-        {isLoading ? (
-          <Card className="border-border/50">
-            <CardContent className="flex items-center justify-center py-16 sm:py-20">
-              <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {/* Coupons List */}
-            {coupons.length > 0 ? (
-              <div className="space-y-3 sm:space-y-4">
-                <h2 className="text-base sm:text-lg font-semibold text-foreground">Mes coupons</h2>
-                <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {coupons.map((coupon) => (
-                    <Card key={coupon.id} className="border-border/50 hover:border-primary/30 transition-all duration-200 hover:shadow-md">
-                      <CardHeader className="p-4 sm:p-5 pb-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <CardTitle className="text-base sm:text-lg break-words font-mono text-foreground mb-1">
-                              {coupon.code}
-                            </CardTitle>
-                            <CardDescription className="text-xs sm:text-sm">
-                              {getPlatformName(coupon.bet_app)}
-                            </CardDescription>
-                          </div>
-                          <Badge variant="secondary" className="flex-shrink-0 text-[10px] sm:text-xs">
-                            Coupon
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-4 sm:p-5 pt-0 space-y-3">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border/50">
-                          <span>Créé le:</span>
-                          <span className="font-medium text-foreground/70">
-                            {format(new Date(coupon.created_at), "dd MMM yyyy", { locale: fr })}
-                          </span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-9 text-xs sm:text-sm border-border/50 hover:bg-primary hover:text-primary-foreground"
-                          onClick={() => copyToClipboard(coupon.code)}
-                        >
-                          {copiedCode === coupon.code ? (
-                            <>
-                              <Check className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                              Copié
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                              Copier le code
-                            </>
-                          )}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
+      {/* Content */}
+      {isLoading ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 text-[#3FA9FF] animate-spin" />
+        </div>
+      ) : coupons.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center py-16 px-4">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+            <Ticket className="w-8 h-8 text-slate-400" />
+          </div>
+          <p className="font-medium text-slate-600 dark:text-slate-300">Aucun coupon</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 text-center">
+            Vos coupons apparaîtront ici
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {coupons.map((coupon) => (
+            <div
+              key={coupon.id}
+              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden hover:border-violet-500/50 transition-colors"
+            >
+              <div className="p-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-mono font-bold text-lg text-slate-900 dark:text-white">
+                      {coupon.code}
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      {getPlatformName(coupon.bet_app)}
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 text-xs font-medium">
+                    Coupon
+                  </span>
                 </div>
               </div>
-            ) : (
-              <Card className="border-border/50">
-                <CardContent className="flex flex-col items-center justify-center py-16 sm:py-20 text-center">
-                  <div className="p-3 rounded-full bg-muted/50 mb-4">
-                    <Ticket className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm sm:text-base font-medium text-foreground/70">Aucun coupon disponible</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1.5">
-                    Vos coupons apparaîtront ici
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </>
-        )}
-      </div>
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Créé le</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    {format(new Date(coupon.created_at), "dd MMM yyyy", { locale: fr })}
+                  </span>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(coupon.code)}
+                  className="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-medium flex items-center justify-center gap-2 text-slate-600 dark:text-slate-300 hover:bg-violet-500 hover:text-white hover:border-violet-500 transition-colors"
+                >
+                  {copiedCode === coupon.code ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Copié!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copier le code
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
-

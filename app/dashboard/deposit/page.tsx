@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { TransactionProgressBar } from "@/components/transaction/progress-bar"
@@ -14,46 +14,31 @@ import { transactionApi, settingsApi } from "@/lib/api-client"
 import type { Platform, UserAppId, Network, UserPhone } from "@/lib/types"
 import { toast } from "react-hot-toast"
 import { extractTimeErrorMessage } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ChevronLeft, Copy, ArrowLeft } from "lucide-react"
+import { ChevronLeft, Copy, ArrowDownToLine, X } from "lucide-react"
 import Link from "next/link"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 
 export default function DepositPage() {
   const router = useRouter()
   const { user } = useAuth()
   
-  // Step management
   const [currentStep, setCurrentStep] = useState(1)
   const totalSteps = 5
   
-  // Form data
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null)
   const [selectedBetId, setSelectedBetId] = useState<UserAppId | null>(null)
   const [selectedNetwork, setSelectedNetwork] = useState<Network | null>(null)
   const [selectedPhone, setSelectedPhone] = useState<UserPhone | null>(null)
   const [amount, setAmount] = useState(0)
   
-  // Confirmation dialog
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  // Transaction link modal
   const [isTransactionLinkModalOpen, setIsTransactionLinkModalOpen] = useState(false)
   const [transactionLink, setTransactionLink] = useState<string | null>(null)
   const [isMoovUssdModalOpen, setIsMoovUssdModalOpen] = useState(false)
   const [moovUssdCode, setMoovUssdCode] = useState<string | null>(null)
   const [moovMerchantPhone, setMoovMerchantPhone] = useState<string | null>(null)
 
-  // Redirect if not authenticated
   if (!user) {
     router.push("/login")
     return null
@@ -94,29 +79,19 @@ export default function DepositPage() {
     if (!selectedNetwork || selectedNetwork.name?.toLowerCase() !== "moov") {
       return false
     }
-
-    // Check if deposit_api is "connect"
     if (!selectedNetwork.deposit_api || selectedNetwork.deposit_api.toLowerCase() !== "connect") {
       return false
     }
-
     try {
       const settings = await settingsApi.get()
       const moovPhone = settings.moov_merchant_phone || settings.moov_marchand_phone
-
-      if (!moovPhone) {
-        return false
-      }
-
+      if (!moovPhone) return false
       const ussdAmount = Math.max(1, Math.floor(amountValue * 0.99))
       const ussdCode = `*155*2*1*${moovPhone}*${ussdAmount}#`
-
       setMoovMerchantPhone(moovPhone)
       setMoovUssdCode(ussdCode)
       setIsMoovUssdModalOpen(true)
-
       attemptDialerRedirect(ussdCode)
-
       return true
     } catch (error) {
       console.error("Erreur lors de la récupération des paramètres Moov:", error)
@@ -126,23 +101,11 @@ export default function DepositPage() {
 
   const handleCopyUssdCode = async () => {
     if (!moovUssdCode) return
-
     try {
       await navigator.clipboard.writeText(moovUssdCode)
       toast.success("Code USSD copié")
     } catch (error) {
-      console.error("Impossible de copier le code USSD:", error)
-      toast.error("Copie impossible, copiez manuellement le code.")
-    }
-  }
-
-  const handleMoovModalClose = (open: boolean) => {
-    if (!open) {
-      // Only navigate to dashboard when user closes the modal
-      setIsMoovUssdModalOpen(false)
-      router.push("/dashboard")
-    } else {
-      setIsMoovUssdModalOpen(true)
+      toast.error("Copie impossible")
     }
   }
 
@@ -151,7 +114,6 @@ export default function DepositPage() {
       toast.error("Données manquantes pour la transaction")
       return
     }
-
     setIsSubmitting(true)
     try {
       const response = await transactionApi.createDeposit({
@@ -162,28 +124,18 @@ export default function DepositPage() {
         network: selectedNetwork.id,
         source: "web"
       })
-      
       toast.success("Dépôt initié avec succès!")
-      
-      // Check if transaction_link exists in the response
       if (response.transaction_link) {
         setTransactionLink(response.transaction_link)
         setIsTransactionLinkModalOpen(true)
         setIsConfirmationOpen(false)
       } else {
         const handled = await handleMoovUssdFlow(amount)
-        if (!handled) {
-          router.push("/dashboard")
-        }
+        if (!handled) router.push("/dashboard")
       }
     } catch (error: any) {
-      // Check for rate limit error (error_time_message)
       const timeErrorMessage = extractTimeErrorMessage(error)
-      if (timeErrorMessage) {
-        toast.error(timeErrorMessage)
-      } else {
-        toast.error("Erreur lors de la création du dépôt")
-      }
+      toast.error(timeErrorMessage || "Erreur lors de la création du dépôt")
     } finally {
       setIsSubmitting(false)
     }
@@ -194,227 +146,148 @@ export default function DepositPage() {
       window.open(transactionLink, "_blank", "noopener,noreferrer")
       setIsTransactionLinkModalOpen(false)
       setTransactionLink(null)
-      
       const handled = await handleMoovUssdFlow(amount)
-      if (!handled) {
-        router.push("/dashboard")
-      }
-    }
-  }
-
-  const isStepValid = () => {
-    switch (currentStep) {
-      case 1:
-        return selectedPlatform !== null
-      case 2:
-        return selectedBetId !== null
-      case 3:
-        return selectedNetwork !== null
-      case 4:
-        return selectedPhone !== null
-      case 5:
-        return amount > 0 && selectedPlatform && 
-               amount >= selectedPlatform.minimun_deposit && 
-               amount <= selectedPlatform.max_deposit
-      default:
-        return false
+      if (!handled) router.push("/dashboard")
     }
   }
 
   const renderCurrentStep = () => {
     switch (currentStep) {
-      case 1:
-        return (
-          <PlatformStep
-            selectedPlatform={selectedPlatform}
-            onSelect={setSelectedPlatform}
-            onNext={handleNext}
-          />
-        )
-      case 2:
-        return (
-          <BetIdStep
-            selectedPlatform={selectedPlatform}
-            selectedBetId={selectedBetId}
-            onSelect={setSelectedBetId}
-            onNext={handleNext}
-          />
-        )
-      case 3:
-        return (
-          <NetworkStep
-            selectedNetwork={selectedNetwork}
-            onSelect={setSelectedNetwork}
-            onNext={handleNext}
-            type="deposit"
-          />
-        )
-      case 4:
-        return (
-          <PhoneStep
-            selectedNetwork={selectedNetwork}
-            selectedPhone={selectedPhone}
-            onSelect={setSelectedPhone}
-            onNext={handleNext}
-          />
-        )
-      case 5:
-    return (
-          <AmountStep
-            amount={amount}
-            setAmount={setAmount}
-            withdriwalCode=""
-            setWithdriwalCode={() => {}}
-            selectedPlatform={selectedPlatform}
-            selectedBetId={selectedBetId}
-            selectedNetwork={selectedNetwork}
-            selectedPhone={selectedPhone}
-            type="deposit"
-            onNext={handleNext}
-          />
-        )
-      default:
-        return null
+      case 1: return <PlatformStep selectedPlatform={selectedPlatform} onSelect={setSelectedPlatform} onNext={handleNext} />
+      case 2: return <BetIdStep selectedPlatform={selectedPlatform} selectedBetId={selectedBetId} onSelect={setSelectedBetId} onNext={handleNext} />
+      case 3: return <NetworkStep selectedNetwork={selectedNetwork} onSelect={setSelectedNetwork} onNext={handleNext} type="deposit" />
+      case 4: return <PhoneStep selectedNetwork={selectedNetwork} selectedPhone={selectedPhone} onSelect={setSelectedPhone} onNext={handleNext} />
+      case 5: return <AmountStep amount={amount} setAmount={setAmount} withdriwalCode="" setWithdriwalCode={() => {}} selectedPlatform={selectedPlatform} selectedBetId={selectedBetId} selectedNetwork={selectedNetwork} selectedPhone={selectedPhone} type="deposit" onNext={handleNext} />
+      default: return null
     }
   }
 
   return (
-    <div className="max-w-4xl mx-auto w-full px-3 sm:px-4 lg:px-6">
-      <div className="space-y-4 sm:space-y-5 lg:space-y-6">
-        {/* Header */}
-        <div className="pb-2 border-b border-border/50">
-          <div className="flex items-center gap-3 mb-2">
-            <Button
-              asChild
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 sm:h-9 sm:w-9"
+    <div className="max-w-lg mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <Link
+          href="/dashboard"
+          className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </Link>
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <ArrowDownToLine className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Dépôt</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Étape {currentStep} sur {totalSteps}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Progress */}
+      <div className="mb-6">
+        <div className="flex gap-1.5">
+          {Array.from({ length: totalSteps }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${
+                i < currentStep ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-800'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+        <div className="p-5">
+          {renderCurrentStep()}
+        </div>
+        {currentStep > 1 && (
+          <div className="px-5 pb-5">
+            <button
+              onClick={handlePrevious}
+              className="flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
             >
-              <Link href="/dashboard">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div className="flex-1">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold tracking-tight">Effectuer un dépôt</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Remplissez les informations pour effectuer votre dépôt</p>
+              <ChevronLeft className="w-4 h-4" />
+              Précédent
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={isConfirmationOpen}
+        onClose={() => setIsConfirmationOpen(false)}
+        onConfirm={handleConfirmTransaction}
+        transactionData={{ amount, phone_number: selectedPhone?.phone || "", app: selectedPlatform?.id || "", user_app_id: selectedBetId?.user_app_id || "", network: selectedNetwork?.id || 0 }}
+        type="deposit"
+        platformName={selectedPlatform?.name || ""}
+        networkName={selectedNetwork?.public_name || ""}
+        isLoading={isSubmitting}
+      />
+
+      {/* Transaction Link Modal */}
+      {isTransactionLinkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl">
+            <div className="p-5 text-center">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Continuer</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Cliquez pour finaliser votre transaction</p>
+            </div>
+            <div className="p-5 pt-0 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => { setIsTransactionLinkModalOpen(false); setTransactionLink(null); router.push("/dashboard") }}
+                className="h-11 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-medium text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleContinueTransaction}
+                className="h-11 rounded-xl bg-[#3FA9FF] text-white font-medium text-sm hover:bg-[#0066FF] transition-colors"
+              >
+                Continuer
+              </button>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Progress Bar */}
-        <TransactionProgressBar 
-          currentStep={currentStep} 
-          totalSteps={totalSteps}
-          type="deposit"
-        />
-
-        {/* Current Step */}
-        <div className="min-h-[280px] sm:min-h-[320px] lg:min-h-[400px] overflow-x-hidden">
-          {renderCurrentStep()}
-        </div>
-
-        {/* Navigation - Show Previous button for steps 2-5 */}
-        {currentStep > 1 && currentStep <= 5 && (
-          <div className="flex justify-start pt-2 sm:pt-3">
-            <Button
-              variant="outline"
-              onClick={handlePrevious}
-              className="flex items-center gap-2 h-9 sm:h-10 text-sm"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span>Précédent</span>
-            </Button>
-          </div>
-        )}
-
-        {/* Confirmation Dialog */}
-        <ConfirmationDialog
-          isOpen={isConfirmationOpen}
-          onClose={() => setIsConfirmationOpen(false)}
-          onConfirm={handleConfirmTransaction}
-          transactionData={{
-            amount,
-            phone_number: selectedPhone?.phone || "",
-            app: selectedPlatform?.id || "",
-            user_app_id: selectedBetId?.user_app_id || "",
-            network: selectedNetwork?.id || 0,
-          }}
-          type="deposit"
-          platformName={selectedPlatform?.name || ""}
-          networkName={selectedNetwork?.public_name || ""}
-          isLoading={isSubmitting}
-        />
-
-        {/* Transaction Link Modal */}
-        <Dialog open={isTransactionLinkModalOpen} onOpenChange={setIsTransactionLinkModalOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Continuer la transaction</DialogTitle>
-              <DialogDescription>
-                Cliquez sur continuer pour continuer la transaction
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsTransactionLinkModalOpen(false)
-                  setTransactionLink(null)
-                  router.push("/dashboard")
-                }}
-              >
-                Annuler
-              </Button>
-              <Button onClick={handleContinueTransaction}>
-                Continuer
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Moov USSD fallback modal */}
-        <Dialog open={isMoovUssdModalOpen} onOpenChange={handleMoovModalClose}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Finaliser la transaction Moov</DialogTitle>
-              <DialogDescription asChild>
-                <div className="text-sm text-muted-foreground space-y-2">
-                  <p>
-                    Nous n&apos;avons pas pu ouvrir automatiquement le composeur téléphonique. Copiez le code ci-dessous et collez-le dans l&apos;application Téléphone pour terminer votre transaction Moov.
-                  </p>
-                  {moovMerchantPhone && (
-                    <p>
-                      <span className="font-semibold text-foreground">Numéro marchand&nbsp;:</span> {moovMerchantPhone}
-                    </p>
-                  )}
-                  {moovUssdCode ? (
-                    <div className="space-y-1">
-                      <p className="font-semibold text-foreground">Code USSD à composer :</p>
-                      <div className="flex items-center gap-2">
-                        <Input value={moovUssdCode} readOnly className="font-mono text-sm" />
-                        <Button variant="outline" size="icon" onClick={handleCopyUssdCode}>
-                          <Copy className="h-4 w-4" />
-                          <span className="sr-only">Copier le code</span>
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Collez ce code dans votre composeur téléphonique et validez pour poursuivre.
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-destructive text-sm">
-                      Impossible de générer le code USSD automatiquement. Veuillez réessayer ou contacter le support.
-                    </p>
-                  )}
+      {/* Moov USSD Modal */}
+      {isMoovUssdModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-bold text-slate-900 dark:text-white">Transaction Moov</h3>
+              <button onClick={() => { setIsMoovUssdModalOpen(false); router.push("/dashboard") }} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Composez ce code USSD pour finaliser</p>
+              {moovMerchantPhone && (
+                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                  <p className="text-xs text-slate-400 mb-1">Marchand</p>
+                  <p className="font-mono font-semibold text-slate-900 dark:text-white">{moovMerchantPhone}</p>
                 </div>
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button onClick={() => handleMoovModalClose(false)}>J&apos;ai compris</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-              </div>
+              )}
+              {moovUssdCode && (
+                <div className="flex gap-2">
+                  <input value={moovUssdCode} readOnly className="flex-1 h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm text-slate-900 dark:text-white" />
+                  <button onClick={handleCopyUssdCode} className="w-11 h-11 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:text-[#3FA9FF] hover:border-[#3FA9FF] transition-colors">
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="p-5 pt-0">
+              <button onClick={() => { setIsMoovUssdModalOpen(false); router.push("/dashboard") }} className="w-full h-11 rounded-xl bg-[#3FA9FF] text-white font-medium text-sm hover:bg-[#0066FF] transition-colors">
+                J&apos;ai compris
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

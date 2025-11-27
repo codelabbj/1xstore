@@ -9,9 +9,8 @@ const inter = Inter({ subsets: ["latin"] })
 
 
 export const metadata: Metadata = {
-  title: "Africash - Gestion de Dépôts et Retraits",
+  title: "1xstore - Gestion de Dépôts et Retraits",
   description: "Plateforme de gestion de transactions pour paris sportifs",
-    generator: 'v0.app'
 }
 
 export default function RootLayout({
