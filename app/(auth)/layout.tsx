@@ -79,7 +79,7 @@ export default function AuthLayout({
               </div>
             </div>
             
-            <div className="flex items-center gap-4 bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+            {/* <div className="flex items-center gap-4 bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
               <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -89,7 +89,7 @@ export default function AuthLayout({
                 <h3 className="font-semibold">Support 24/7</h3>
                 <p className="text-sm text-white/70">Une équipe à votre écoute</p>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
