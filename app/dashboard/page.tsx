@@ -313,7 +313,7 @@ export default function DashboardPage() {
               </div>
               <div className="p-2">
                 <a
-                  href="https://wa.me/message/234000000000"
+                  href="https://wa.me/22962795682"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
@@ -326,7 +326,7 @@ export default function DashboardPage() {
                   <span className="font-medium text-slate-700 dark:text-slate-200 text-sm">WhatsApp</span>
                 </a>
                 <a
-                  href="https://t.me/1xstore"
+                  href="https://t.me/Vianelgts"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
