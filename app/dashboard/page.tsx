@@ -21,6 +21,8 @@ export default function DashboardPage() {
   const [currentAdIndex, setCurrentAdIndex] = useState(0)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [referralBonusEnabled, setReferralBonusEnabled] = useState(false)
+  const [whatsappPhone, setWhatsappPhone] = useState("")
+  const [telegram, setTelegram] = useState("")
 
   useEffect(() => {
     window.history.replaceState(null, "", window.location.href)
@@ -64,9 +66,13 @@ export default function DashboardPage() {
     try {
       const settings = await settingsApi.get()
       setReferralBonusEnabled(settings?.referral_bonus === true)
+      setWhatsappPhone(settings?.whatsapp_phone || "")
+      setTelegram(settings?.telegram || "")
     } catch (error) {
       console.error("Error fetching settings:", error)
       setReferralBonusEnabled(false)
+      setWhatsappPhone("")
+      setTelegram("")
     }
   }
 
@@ -313,7 +319,7 @@ export default function DashboardPage() {
               </div>
               <div className="p-2">
                 <a
-                  href="https://wa.me/22962795682"
+                  href={`https://wa.me/${whatsappPhone}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
@@ -326,7 +332,7 @@ export default function DashboardPage() {
                   <span className="font-medium text-slate-700 dark:text-slate-200 text-sm">WhatsApp</span>
                 </a>
                 <a
-                  href="https://t.me/Vianelgts"
+                  href={telegram.startsWith('http') ? telegram : `https://t.me/${telegram}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"

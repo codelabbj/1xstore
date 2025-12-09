@@ -35,9 +35,9 @@ export default function DepositPage() {
   
   const [isTransactionLinkModalOpen, setIsTransactionLinkModalOpen] = useState(false)
   const [transactionLink, setTransactionLink] = useState<string | null>(null)
-  const [isMoovUssdModalOpen, setIsMoovUssdModalOpen] = useState(false)
-  const [moovUssdCode, setMoovUssdCode] = useState<string | null>(null)
-  const [moovMerchantPhone, setMoovMerchantPhone] = useState<string | null>(null)
+  const [isNetworkUssdModalOpen, setIsNetworkUssdModalOpen] = useState(false)
+  const [networkUssdCode, setNetworkUssdCode] = useState<string | null>(null)
+  const [networkMerchantPhone, setNetworkMerchantPhone] = useState<string | null>(null)
 
   if (!user) {
     router.push("/login")
@@ -75,34 +75,63 @@ export default function DepositPage() {
     }
   }
 
-  const handleMoovUssdFlow = async (amountValue: number) => {
-    if (!selectedNetwork || selectedNetwork.name?.toLowerCase() !== "moov") {
-      return false
-    }
+  const handleNetworkUssdFlow = async (amountValue: number) => {
+    if (!selectedNetwork) return false
     if (!selectedNetwork.deposit_api || selectedNetwork.deposit_api.toLowerCase() !== "connect") {
       return false
     }
+
+    const networkName = selectedNetwork.name?.toLowerCase()
+    if (networkName !== "moov" && networkName !== "orange") {
+      return false
+    }
+
     try {
       const settings = await settingsApi.get()
-      const moovPhone = settings.moov_merchant_phone || settings.moov_marchand_phone
-      if (!moovPhone) return false
-      const ussdAmount = Math.max(1, Math.floor(amountValue * 0.99))
-      const ussdCode = `*155*2*1*${moovPhone}*${ussdAmount}#`
-      setMoovMerchantPhone(moovPhone)
-      setMoovUssdCode(ussdCode)
-      setIsMoovUssdModalOpen(true)
-      attemptDialerRedirect(ussdCode)
-      return true
+      let merchantPhone: string | null = null
+      let ussdCode: string | null = null
+      const isBurkina = selectedNetwork.country_code?.toLowerCase() === "bf"
+
+      if (networkName === "moov") {
+        // For Moov, always use USSD
+        merchantPhone = isBurkina
+          ? settings.bf_moov_marchand_phone
+          : (settings.moov_merchant_phone || settings.moov_marchand_phone)
+        if (!merchantPhone) return false
+        const ussdAmount = Math.max(1, Math.floor(amountValue * 0.99))
+        ussdCode = `*155*2*1*${merchantPhone}*${ussdAmount}#`
+      } else if (networkName === "orange") {
+        // For Orange, check payment_by_link setting
+        if (selectedNetwork.payment_by_link === true) {
+          return false // Don't show USSD modal, let transaction link handle it
+        }
+        // If payment_by_link is false, use USSD
+        merchantPhone = isBurkina
+          ? settings.bf_orange_marchand_phone
+          : settings.orange_marchand_phone
+        if (!merchantPhone) return false
+        ussdCode = `*144*2*1*${merchantPhone}*${amountValue}#`
+      }
+
+      if (merchantPhone && ussdCode) {
+        setNetworkMerchantPhone(merchantPhone)
+        setNetworkUssdCode(ussdCode)
+        setIsNetworkUssdModalOpen(true)
+        attemptDialerRedirect(ussdCode)
+        return true
+      }
+
+      return false
     } catch (error) {
-      console.error("Erreur lors de la récupération des paramètres Moov:", error)
+      console.error("Erreur lors de la récupération des paramètres réseau:", error)
       return false
     }
   }
 
   const handleCopyUssdCode = async () => {
-    if (!moovUssdCode) return
+    if (!networkUssdCode) return
     try {
-      await navigator.clipboard.writeText(moovUssdCode)
+      await navigator.clipboard.writeText(networkUssdCode)
       toast.success("Code USSD copié")
     } catch (error) {
       toast.error("Copie impossible")
@@ -130,7 +159,7 @@ export default function DepositPage() {
         setIsTransactionLinkModalOpen(true)
         setIsConfirmationOpen(false)
       } else {
-        const handled = await handleMoovUssdFlow(amount)
+        const handled = await handleNetworkUssdFlow(amount)
         if (!handled) router.push("/dashboard")
       }
     } catch (error: any) {
@@ -253,27 +282,27 @@ export default function DepositPage() {
         </div>
       )}
 
-      {/* Moov USSD Modal */}
-      {isMoovUssdModalOpen && (
+      {/* Network USSD Modal */}
+      {isNetworkUssdModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl">
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
-              <h3 className="font-bold text-slate-900 dark:text-white">Transaction Moov</h3>
-              <button onClick={() => { setIsMoovUssdModalOpen(false); router.push("/dashboard") }} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+              <h3 className="font-bold text-slate-900 dark:text-white">Transaction {selectedNetwork?.public_name || 'Mobile'}</h3>
+              <button onClick={() => { setIsNetworkUssdModalOpen(false); router.push("/dashboard") }} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-5 space-y-4">
               <p className="text-sm text-slate-500 dark:text-slate-400">Composez ce code USSD pour finaliser</p>
-              {moovMerchantPhone && (
+              {networkMerchantPhone && (
                 <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
                   <p className="text-xs text-slate-400 mb-1">Marchand</p>
-                  <p className="font-mono font-semibold text-slate-900 dark:text-white">{moovMerchantPhone}</p>
+                  <p className="font-mono font-semibold text-slate-900 dark:text-white">{networkMerchantPhone}</p>
                 </div>
               )}
-              {moovUssdCode && (
+              {networkUssdCode && (
                 <div className="flex gap-2">
-                  <input value={moovUssdCode} readOnly className="flex-1 h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm text-slate-900 dark:text-white" />
+                  <input value={networkUssdCode} readOnly className="flex-1 h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm text-slate-900 dark:text-white" />
                   <button onClick={handleCopyUssdCode} className="w-11 h-11 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:text-[#3FA9FF] hover:border-[#3FA9FF] transition-colors">
                     <Copy className="w-4 h-4" />
                   </button>
@@ -281,7 +310,7 @@ export default function DepositPage() {
               )}
             </div>
             <div className="p-5 pt-0">
-              <button onClick={() => { setIsMoovUssdModalOpen(false); router.push("/dashboard") }} className="w-full h-11 rounded-xl bg-[#3FA9FF] text-white font-medium text-sm hover:bg-[#0066FF] transition-colors">
+              <button onClick={() => { setIsNetworkUssdModalOpen(false); router.push("/dashboard") }} className="w-full h-11 rounded-xl bg-[#3FA9FF] text-white font-medium text-sm hover:bg-[#0066FF] transition-colors">
                 J&apos;ai compris
               </button>
             </div>

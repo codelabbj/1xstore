@@ -6,7 +6,7 @@ export function Footer() {
           <p className="text-xs sm:text-sm text-muted-foreground text-center">
             Développé par{" "}
             <a
-              href="https://wa.me/22947030588"
+              href="https://codelab.bj/"
               target="_blank"
               rel="noopener noreferrer"
               className="font-semibold text-primary hover:text-primary/80 transition-colors underline-offset-4 hover:underline"
