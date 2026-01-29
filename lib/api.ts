@@ -19,19 +19,19 @@ function detectLang(text: string) {
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("access_token")
   if (token) config.headers.Authorization = `Bearer ${token}`
-  
+
   // Ensure fresh data with cache busting
   config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
   config.headers['Pragma'] = 'no-cache'
   config.headers['Expires'] = '0'
-  
+
   // Add timestamp to prevent caching
   if (config.params) {
     config.params._t = Date.now()
   } else {
     config.params = { _t: Date.now() }
   }
-  
+
   return config
 })
 
@@ -39,7 +39,7 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
-    
+
     // Handle network errors (no response from server)
     if (!error.response) {
       const networkErrorMsg = "Erreur de connexion. Vérifiez votre connexion internet et réessayez."
@@ -49,7 +49,7 @@ api.interceptors.response.use(
       }
       return Promise.reject(error)
     }
-    
+
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true
       try {
