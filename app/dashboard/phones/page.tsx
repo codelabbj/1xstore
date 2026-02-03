@@ -18,7 +18,7 @@ const COUNTRY_OPTIONS = [
   { label: "Côte d'Ivoire", value: "ci", prefix: "+225" },
 ]
 
-const DEFAULT_COUNTRY_VALUE = "ci"
+const DEFAULT_COUNTRY_VALUE = "bj"
 
 const buildInternationalPhone = (input: string, countryValue: string) => {
   const country = COUNTRY_OPTIONS.find(option => option.value === countryValue)
@@ -91,7 +91,7 @@ export default function PhonesPage() {
       setUserPhones(phonesData)
       setNetworks(networksData)
       setPlatforms(platformsData)
-      try { const appIds = await userAppIdApi.getAll(); setUserAppIds(appIds) } catch {}
+      try { const appIds = await userAppIdApi.getAll(); setUserAppIds(appIds) } catch { }
     } catch (error) {
       console.error("Failed to load data:", error)
     } finally {

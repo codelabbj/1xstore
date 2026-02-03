@@ -48,17 +48,17 @@ export default function SignupPage() {
 
   const signupSchema = referralBonusEnabled
     ? baseSignupSchema
-        .extend({
-          referral_code: z.string().optional(),
-        })
-        .refine((data) => data.password === data.re_password, {
-          message: "Les mots de passe ne correspondent pas",
-          path: ["re_password"],
-        })
-    : baseSignupSchema.refine((data) => data.password === data.re_password, {
+      .extend({
+        referral_code: z.string().optional(),
+      })
+      .refine((data) => data.password === data.re_password, {
         message: "Les mots de passe ne correspondent pas",
         path: ["re_password"],
       })
+    : baseSignupSchema.refine((data) => data.password === data.re_password, {
+      message: "Les mots de passe ne correspondent pas",
+      path: ["re_password"],
+    })
 
   const {
     register,
@@ -70,7 +70,7 @@ export default function SignupPage() {
   })
 
   const password = watch("password", "")
-  
+
   // Password strength indicators
   const hasMinLength = password.length >= 6
   const hasUppercase = /[A-Z]/.test(password)
@@ -88,11 +88,11 @@ export default function SignupPage() {
         password: data.password,
         re_password: data.re_password,
       }
-      
+
       if (referralBonusEnabled && data.referral_code) {
         registrationData.referral_code = data.referral_code
       }
-      
+
       await authApi.register(registrationData)
       toast.success("Compte créé avec succès! Veuillez vous connecter.")
       router.push("/login")
@@ -186,12 +186,12 @@ export default function SignupPage() {
                 <Mail className="w-5 h-5" />
               </div>
               <input
-              type="email"
+                type="email"
                 placeholder="votre@email.com"
-              {...register("email")}
-              disabled={isLoading}
+                {...register("email")}
+                disabled={isLoading}
                 className="w-full h-12 sm:h-14 pl-12 pr-4 rounded-xl sm:rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200 text-sm sm:text-base"
-            />
+              />
             </div>
             {errors.email && (
               <p className="text-xs text-red-500 flex items-center gap-1">
@@ -211,12 +211,12 @@ export default function SignupPage() {
                 <Phone className="w-5 h-5" />
               </div>
               <input
-              type="tel"
-              placeholder="+225 01 02 03 04 05"
-              {...register("phone")}
-              disabled={isLoading}
+                type="tel"
+                placeholder="+229 01 02 03 04 05"
+                {...register("phone")}
+                disabled={isLoading}
                 className="w-full h-12 sm:h-14 pl-12 pr-4 rounded-xl sm:rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200 text-sm sm:text-base"
-            />
+              />
             </div>
             {errors.phone && (
               <p className="text-xs text-red-500 flex items-center gap-1">
@@ -251,7 +251,7 @@ export default function SignupPage() {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            
+
             {/* Password Strength Indicators */}
             {password && (
               <div className="grid grid-cols-2 gap-2 mt-3">
@@ -273,7 +273,7 @@ export default function SignupPage() {
                 </div>
               </div>
             )}
-            
+
             {errors.password && (
               <p className="text-xs text-red-500 flex items-center gap-1">
                 <span className="w-1 h-1 rounded-full bg-red-500" />
@@ -328,12 +328,12 @@ export default function SignupPage() {
                   <Gift className="w-5 h-5" />
                 </div>
                 <input
-                type="text"
+                  type="text"
                   placeholder="Entrez le code de parrainage"
-                {...register("referral_code")}
-                disabled={isLoading}
+                  {...register("referral_code")}
+                  disabled={isLoading}
                   className="w-full h-12 sm:h-14 pl-12 pr-4 rounded-xl sm:rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:border-solid focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200 text-sm sm:text-base"
-              />
+                />
               </div>
             </div>
           )}
@@ -376,6 +376,6 @@ export default function SignupPage() {
           </Link>
         </p>
       </div>
-        </div>
+    </div>
   )
 }

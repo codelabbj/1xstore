@@ -30,7 +30,7 @@ const COUNTRY_OPTIONS = [
   { label: "Côte d'Ivoire", value: "ci", prefix: "+225" },
 ]
 
-const DEFAULT_COUNTRY_VALUE = "ci"
+const DEFAULT_COUNTRY_VALUE = "bj"
 
 const buildInternationalPhone = (input: string, countryValue: string) => {
   const country = COUNTRY_OPTIONS.find(option => option.value === countryValue)

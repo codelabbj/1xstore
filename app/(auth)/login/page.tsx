@@ -52,7 +52,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
-  
+
   // Forgot password states
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [forgotPasswordStep, setForgotPasswordStep] = useState(1)
@@ -107,7 +107,7 @@ export default function LoginPage() {
       const response = await authApi.login(data.email_or_phone, data.password)
       login(response.access, response.refresh, response.data)
       toast.success("Connexion réussie!")
-      
+
       try {
         const userId = response.data?.id
         if (userId) {
@@ -120,7 +120,7 @@ export default function LoginPage() {
       } catch (fcmError) {
         console.error('[Login] Error setting up notifications:', fcmError)
       }
-      
+
       await new Promise(resolve => setTimeout(resolve, 300))
       router.push("/dashboard")
     } catch (error) {
@@ -186,12 +186,12 @@ export default function LoginPage() {
                 <Mail className="w-5 h-5" />
               </div>
               <input
-              type="email"
+                type="email"
                 placeholder="votre@email.com"
-              {...forgotPasswordEmailForm.register("email")}
-              disabled={isForgotPasswordLoading}
+                {...forgotPasswordEmailForm.register("email")}
+                disabled={isForgotPasswordLoading}
                 className="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200"
-            />
+              />
             </div>
             {forgotPasswordEmailForm.formState.errors.email && (
               <p className="text-sm text-red-500 flex items-center gap-1">
@@ -247,7 +247,7 @@ export default function LoginPage() {
               Un code a été envoyé à <span className="font-medium text-slate-700 dark:text-slate-300">{forgotPasswordEmail}</span>
             </p>
           </div>
-          
+
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Code OTP
@@ -402,9 +402,9 @@ export default function LoginPage() {
               ? forgotPasswordStep === 1
                 ? "Entrez votre email pour recevoir un code"
                 : forgotPasswordStep === 2
-                ? "Vérifiez votre email"
-                : "Créez un nouveau mot de passe"
-                : " "
+                  ? "Vérifiez votre email"
+                  : "Créez un nouveau mot de passe"
+              : " "
             }
           </p>
         </div>
@@ -425,12 +425,12 @@ export default function LoginPage() {
                     <Mail className="w-5 h-5" />
                   </div>
                   <input
-                  type="text"
-                    placeholder="votre@email.com ou +225..."
-                  {...register("email_or_phone")}
-                  disabled={isLoading}
+                    type="text"
+                    placeholder="votre@email.com ou +229..."
+                    {...register("email_or_phone")}
+                    disabled={isLoading}
                     className="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200"
-                />
+                  />
                 </div>
                 {errors.email_or_phone && (
                   <p className="text-sm text-red-500 flex items-center gap-1">
@@ -479,11 +479,11 @@ export default function LoginPage() {
                   <div className="relative">
                     <input
                       type="checkbox"
-                    checked={rememberMe}
+                      checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                    disabled={isLoading}
+                      disabled={isLoading}
                       className="peer sr-only"
-                  />
+                    />
                     <div className="w-5 h-5 rounded-lg border-2 border-slate-300 dark:border-slate-600 peer-checked:border-[#3FA9FF] peer-checked:bg-[#3FA9FF] transition-all duration-200 flex items-center justify-center">
                       <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -527,7 +527,7 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-          {!isForgotPassword && (
+        {!isForgotPassword && (
           <div className="px-6 sm:px-8 py-5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
             <p className="text-center text-slate-600 dark:text-slate-400">
               Pas encore de compte?{" "}
@@ -535,8 +535,8 @@ export default function LoginPage() {
                 Créer un compte
               </Link>
             </p>
-            </div>
-          )}
+          </div>
+        )}
       </div>
 
       {/* Download App */}
