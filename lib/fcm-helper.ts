@@ -1,74 +1,147 @@
 import { fcmService } from './firebase';
 import api from './api';
 
+let isInitialized = false;
+
+// Constants for Notification Channel
+const CHANNEL_ID = '1xstore_foreground';
+const CHANNEL_NAME = '1xstore_foreground';
+
 /**
- * Initialize FCM and get token
- * @returns FCM token or null if permission denied/error
+ * Initialize Push Notifications (Web Adapter)
+ * Adapted from Capacitor logic for standard Web/Firebase
  */
-export async function initializeFCM(userId?: string): Promise<string | null> {
-  if (typeof window === 'undefined') {
+export async function initializePushNotifications(userId?: string): Promise<string | null> {
+  console.log('🚀 [TEST LOG] initializePushNotifications() called at:', new Date().toISOString());
+
+  // Ne pas initialiser plusieurs fois
+  if (isInitialized) {
+    console.log('⚠️ [TEST LOG] Push notifications already initialized, skipping...');
+    return fcmService.getToken();
+  }
+
+  console.log('🔍 [TEST LOG] Checking platform compatibility...');
+
+  // Pour le web, on vérifie si le navigateur supporte les notifications
+  // et si fcmService est disponible
+  if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
+    console.log('❌ [TEST LOG] Push notifications not available on this browser/environment - exiting');
     return null;
   }
 
+  const platform = 'web';
+  console.log(`✅ [TEST LOG] Initializing push notifications on ${platform} platform`);
+  console.log(`ℹ️ [TEST LOG] Platform: ${platform}, ServiceWorker supported: ${'serviceWorker' in navigator}`);
+
   try {
-    console.log('[FCM] Starting initialization...');
-    
-    // Check current permission state first
-    const currentPermission = Notification.permission;
-    console.log('[FCM] Current permission:', currentPermission);
-    
-    if (currentPermission === 'denied') {
-      console.warn('[FCM] Notification permission is already denied');
+    // Vérifier d'abord l'état actuel des permissions
+    console.log('🔐 [TEST LOG] Checking current push notification permissions...');
+    let permStatus = Notification.permission;
+    console.log('🔐 [TEST LOG] Current permission status:', permStatus);
+
+    // Si la permission n'a pas encore été demandée (default), la demander
+    if (permStatus === 'default') {
+      console.log('📋 [TEST LOG] Requesting push notification permissions...');
+      const permission = await Notification.requestPermission();
+      permStatus = permission;
+      console.log('📋 [TEST LOG] Permission request result:', permStatus);
+    } else if (permStatus === 'denied') {
+      // Si la permission a été refusée, ne pas continuer
+      console.warn('🚫 [TEST LOG] Push notification permission denied by user. User can enable it in browser settings.');
+      return null;
+    } else if (permStatus === 'granted') {
+      console.log('✅ [TEST LOG] Push notification permission already granted');
+    }
+
+    // Vérifier si la permission a été accordée avant de continuer
+    if (permStatus !== 'granted') {
+      console.warn('🚫 [TEST LOG] Push notification permission not granted:', permStatus);
       return null;
     }
-    
-    // Register service worker first
-    console.log('[FCM] Registering service worker...');
+
+    console.log('✅ [TEST LOG] Push notification permission granted, setting up listeners...');
+
+    // Simulation de la création du canal pour le contexte Web (pour garder la logique "1xstore")
+    console.log(`✅ [TEST LOG] Configuring notification channel: ${CHANNEL_NAME} (${CHANNEL_ID})`);
+    // Note: Sur le web, les "channels" ne sont pas gérés par le navigateur de la même façon qu'Android, 
+    // mais on définit ces constantes pour la cohérence des logs et l'usage futur.
+
+    // IMPORTANT: Ajouter les listeners 
+    console.log('👂 [TEST LOG] Adding push notification event listeners...');
+
+    // Écouter les messages au premier plan (Foreground)
+    fcmService.setupForegroundListener((payload) => {
+      console.log('📨 [TEST LOG] Push notification received while app in foreground:', {
+        title: payload.notification?.title,
+        body: payload.notification?.body,
+        data: payload.data,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Afficher une notification système même au premier plan si possible
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(payload.notification?.title || 'Notification', {
+            body: payload.notification?.body || '',
+            icon: '/icon-192x192.png',
+            tag: CHANNEL_ID, // Utilise l'ID du canal comme tag pour regrouper/remplacer
+            data: {
+              ...payload.data,
+              channelId: CHANNEL_ID
+            }
+          });
+          console.log(`✅ [TEST LOG] System notification displayed for foreground push (Channel: ${CHANNEL_NAME})`);
+        } catch (error) {
+          console.error('❌ [TEST LOG] Error displaying system notification:', error);
+        }
+      }
+    });
+
+    console.log('👂 [TEST LOG] All listeners added, now registering for push notifications (getting token)...');
+
+    // Enregistrer pour recevoir les notifications (Get Token)
+    console.log('📝 [TEST LOG] Calling fcmService.refreshToken() / getToken...');
+
+    // Assurer que le SW est enregistré
     await fcmService.registerServiceWorker();
-    console.log('[FCM] Service worker registered');
 
-    // Request notification permission (this will show the browser prompt)
-    console.log('[FCM] Requesting notification permission...');
-    const permission = await fcmService.requestNotificationPermission();
-    console.log('[FCM] Permission result:', permission);
-    
-    if (permission !== 'granted') {
-      console.warn('[FCM] Notification permission not granted:', permission);
-      return null;
-    }
-
-    // Get FCM token
-    console.log('[FCM] Getting FCM token...');
     const token = await fcmService.refreshToken();
-    
+
     if (token) {
-      console.log('[FCM] Token generated successfully:', token.substring(0, 20) + '...');
-      // Store token in localStorage for persistence
-      localStorage.setItem('fcm_token', token);
-      
-      // Send token to backend if userId provided
+      console.log('🔔 [TEST LOG] Push registration success! Token received:', {
+        token_preview: token.substring(0, 30) + '...',
+        full_token_length: token.length,
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(`📱 [TEST LOG] Platform detected: ${platform}, preparing to send token to backend...`);
+
+      // Enregistrer le device sur le backend
       if (userId) {
         await sendTokenToBackend(token, userId);
+      } else {
+        console.warn('⚠️ [TEST LOG] No userId provided, skipping backend registration until login');
       }
+
+      isInitialized = true;
+      console.log('✅ [TEST LOG] Push notifications registration completed successfully!');
+      return token;
     } else {
-      console.warn('[FCM] No token generated');
+      console.error('❌ [TEST LOG] Failed to get FCM token');
+      return null;
     }
 
-    return token;
   } catch (error) {
-    console.error('[FCM] Error initializing FCM:', error);
+    console.error('Error initializing push notifications:', error);
     return null;
   }
 }
 
 /**
  * Send FCM token to backend
- * @param token FCM token (registration_id)
- * @param userId User ID (required)
- * @returns Promise<boolean> Success status
  */
 export async function sendTokenToBackend(
-  token: string, 
+  token: string,
   userId?: string
 ): Promise<boolean> {
   if (!userId) {
@@ -88,33 +161,21 @@ export async function sendTokenToBackend(
     return true;
   } catch (error: any) {
     console.error('[FCM] Error sending token to backend:', error);
-    // Don't show toast error for FCM token registration failures
     return false;
   }
 }
 
 /**
- * Complete FCM setup flow
- * 1. Request permission
- * 2. Get token
- * 3. Send to backend
- * @param userId Optional user ID
- * @returns Promise<string | null> FCM token or null
+ * Legacy/Wrapper for compatibility
  */
 export async function setupNotifications(userId?: string): Promise<string | null> {
-  try {
-    // Step 1: Initialize FCM and get token (userId is passed through to backend)
-    const token = await initializeFCM(userId);
-    
-    if (!token) {
-      return null;
-    }
+  return initializePushNotifications(userId);
+}
 
-    return token;
-  } catch (error) {
-    console.error('Error setting up notifications:', error);
-    return null;
-  }
+// Keep initializeFCM for backward compatibility if imported elsewhere, 
+// strictly mapped to the new function
+export async function initializeFCM(userId?: string): Promise<string | null> {
+  return initializePushNotifications(userId);
 }
 
 /**
@@ -128,4 +189,3 @@ export function setupForegroundListener(
     onMessage(payload);
   });
 }
-
