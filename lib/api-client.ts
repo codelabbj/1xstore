@@ -20,10 +20,10 @@ import type {
 export const authApi = {
   login: async (email_or_phone: string, password: string) => {
     // Format phone number if it looks like a phone (contains digits and possibly +)
-    const formattedInput = /^[\d\s+()-]+$/.test(email_or_phone) 
-      ? formatPhoneNumber(email_or_phone) 
+    const formattedInput = /^[\d\s+()-]+$/.test(email_or_phone)
+      ? formatPhoneNumber(email_or_phone)
       : email_or_phone
-    
+
     const { data } = await api.post<AuthResponse>("/auth/login", {
       email_or_phone: formattedInput,
       password,
@@ -110,15 +110,16 @@ export const authApi = {
 }
 
 export const networkApi = {
-  getAll: async () => {
-    const { data } = await api.get<Network[]>("/mobcash/network")
+  getAll: async (type?: "deposit" | "withdrawal") => {
+    const url = type ? `/mobcash/network?type=${type}` : "/mobcash/network"
+    const { data } = await api.get<Network[]>(url)
     return data
   },
 }
 
 export const phoneApi = {
   getAll: async (network?: number) => {
-    const url = network 
+    const url = network
       ? `/mobcash/user-phone/?network=${network}`
       : "/mobcash/user-phone/"
     const { data } = await api.get<UserPhone[]>(url)
@@ -147,8 +148,9 @@ export const phoneApi = {
 }
 
 export const platformApi = {
-  getAll: async () => {
-    const { data } = await api.get<Platform[]>("/mobcash/plateform")
+  getAll: async (type?: "deposit" | "withdrawal") => {
+    const url = type ? `/mobcash/plateform?type=${type}` : "/mobcash/plateform"
+    const { data } = await api.get<Platform[]>(url)
     return data
   },
 }

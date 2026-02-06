@@ -20,17 +20,17 @@ import Link from "next/link"
 export default function WithdrawalPage() {
   const router = useRouter()
   const { user } = useAuth()
-  
+
   const [currentStep, setCurrentStep] = useState(1)
   const totalSteps = 5
-  
+
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null)
   const [selectedBetId, setSelectedBetId] = useState<UserAppId | null>(null)
   const [selectedNetwork, setSelectedNetwork] = useState<Network | null>(null)
   const [selectedPhone, setSelectedPhone] = useState<UserPhone | null>(null)
   const [amount, setAmount] = useState(0)
   const [withdriwalCode, setWithdriwalCode] = useState("")
-  
+
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -82,7 +82,7 @@ export default function WithdrawalPage() {
 
   const renderCurrentStep = () => {
     switch (currentStep) {
-      case 1: return <PlatformStep selectedPlatform={selectedPlatform} onSelect={setSelectedPlatform} onNext={handleNext} />
+      case 1: return <PlatformStep selectedPlatform={selectedPlatform} onSelect={setSelectedPlatform} onNext={handleNext} type="withdrawal" />
       case 2: return <BetIdStep selectedPlatform={selectedPlatform} selectedBetId={selectedBetId} onSelect={setSelectedBetId} onNext={handleNext} />
       case 3: return <NetworkStep selectedNetwork={selectedNetwork} onSelect={setSelectedNetwork} onNext={handleNext} type="withdrawal" />
       case 4: return <PhoneStep selectedNetwork={selectedNetwork} selectedPhone={selectedPhone} onSelect={setSelectedPhone} onNext={handleNext} />
@@ -118,9 +118,8 @@ export default function WithdrawalPage() {
           {Array.from({ length: totalSteps }).map((_, i) => (
             <div
               key={i}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${
-                i < currentStep ? 'bg-amber-500' : 'bg-slate-200 dark:bg-slate-800'
-              }`}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${i < currentStep ? 'bg-amber-500' : 'bg-slate-200 dark:bg-slate-800'
+                }`}
             />
           ))}
         </div>

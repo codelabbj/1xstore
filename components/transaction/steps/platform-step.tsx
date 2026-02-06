@@ -14,16 +14,17 @@ interface PlatformStepProps {
   selectedPlatform: Platform | null
   onSelect: (platform: Platform) => void
   onNext: () => void
+  type: "deposit" | "withdrawal"
 }
 
-export function PlatformStep({ selectedPlatform, onSelect, onNext }: PlatformStepProps) {
+export function PlatformStep({ selectedPlatform, onSelect, onNext, type }: PlatformStepProps) {
   const [platforms, setPlatforms] = useState<Platform[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchPlatforms = async () => {
       try {
-        const data = await platformApi.getAll()
+        const data = await platformApi.getAll(type)
         // Filter only enabled platforms
         const enabledPlatforms = data.filter(platform => platform.enable)
         setPlatforms(enabledPlatforms)
@@ -35,7 +36,7 @@ export function PlatformStep({ selectedPlatform, onSelect, onNext }: PlatformSte
     }
 
     fetchPlatforms()
-  }, [])
+  }, [type])
 
   if (isLoading) {
     return (
@@ -58,11 +59,10 @@ export function PlatformStep({ selectedPlatform, onSelect, onNext }: PlatformSte
           {platforms.map((platform) => (
             <Card
               key={platform.id}
-              className={`group cursor-pointer transition-all duration-200 border-2 overflow-hidden ${
-                selectedPlatform?.id === platform.id
+              className={`group cursor-pointer transition-all duration-200 border-2 overflow-hidden ${selectedPlatform?.id === platform.id
                   ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-md shadow-emerald-500/10"
                   : "border-border/50 hover:border-border hover:shadow-sm bg-card"
-              }`}
+                }`}
               onClick={() => {
                 onSelect(platform)
                 setTimeout(() => {
@@ -108,7 +108,7 @@ export function PlatformStep({ selectedPlatform, onSelect, onNext }: PlatformSte
             </Card>
           ))}
         </div>
-        
+
         {platforms.length === 0 && (
           <div className="text-center py-12">
             <p className="text-sm text-muted-foreground">Aucune plateforme disponible</p>

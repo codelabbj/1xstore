@@ -23,9 +23,9 @@ export function NetworkStep({ selectedNetwork, onSelect, onNext, type }: Network
   useEffect(() => {
     const fetchNetworks = async () => {
       try {
-        const data = await networkApi.getAll()
+        const data = await networkApi.getAll(type)
         // Filter networks based on transaction type
-        const activeNetworks = data.filter(network => 
+        const activeNetworks = data.filter(network =>
           type === TRANSACTION_TYPES.DEPOSIT ? network.active_for_deposit : network.active_for_with
         )
         setNetworks(activeNetworks)
@@ -65,13 +65,12 @@ export function NetworkStep({ selectedNetwork, onSelect, onNext, type }: Network
           {networks.map((network) => (
             <Card
               key={network.id}
-              className={`group cursor-pointer transition-all duration-200 border-2 overflow-hidden ${
-                selectedNetwork?.id === network.id
+              className={`group cursor-pointer transition-all duration-200 border-2 overflow-hidden ${selectedNetwork?.id === network.id
                   ? isDeposit
                     ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-md shadow-emerald-500/10"
                     : "border-orange-500 bg-orange-50/50 dark:bg-orange-950/20 shadow-md shadow-orange-500/10"
                   : "border-border/50 hover:border-border hover:shadow-sm bg-card"
-              }`}
+                }`}
               onClick={() => {
                 onSelect(network)
                 setTimeout(() => {
@@ -92,21 +91,19 @@ export function NetworkStep({ selectedNetwork, onSelect, onNext, type }: Network
                     <p className="text-[11px] sm:text-xs text-muted-foreground truncate">{network.name}</p>
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {network.active_for_deposit && (
-                        <Badge 
-                          variant={isDeposit ? "default" : "secondary"} 
-                          className={`text-[10px] sm:text-xs font-medium ${
-                            isDeposit ? "bg-emerald-500 hover:bg-emerald-600" : ""
-                          }`}
+                        <Badge
+                          variant={isDeposit ? "default" : "secondary"}
+                          className={`text-[10px] sm:text-xs font-medium ${isDeposit ? "bg-emerald-500 hover:bg-emerald-600" : ""
+                            }`}
                         >
                           {getTransactionTypeLabel(TRANSACTION_TYPES.DEPOSIT)}
                         </Badge>
                       )}
                       {network.active_for_with && (
-                        <Badge 
-                          variant={!isDeposit ? "default" : "secondary"} 
-                          className={`text-[10px] sm:text-xs font-medium ${
-                            !isDeposit ? "bg-orange-500 hover:bg-orange-600" : ""
-                          }`}
+                        <Badge
+                          variant={!isDeposit ? "default" : "secondary"}
+                          className={`text-[10px] sm:text-xs font-medium ${!isDeposit ? "bg-orange-500 hover:bg-orange-600" : ""
+                            }`}
                         >
                           {getTransactionTypeLabel(TRANSACTION_TYPES.WITHDRAWAL)}
                         </Badge>
@@ -118,7 +115,7 @@ export function NetworkStep({ selectedNetwork, onSelect, onNext, type }: Network
             </Card>
           ))}
         </div>
-        
+
         {networks.length === 0 && (
           <div className="text-center py-12">
             <p className="text-sm text-muted-foreground break-words">

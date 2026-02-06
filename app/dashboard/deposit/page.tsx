@@ -20,19 +20,19 @@ import Link from "next/link"
 export default function DepositPage() {
   const router = useRouter()
   const { user } = useAuth()
-  
+
   const [currentStep, setCurrentStep] = useState(1)
   const totalSteps = 5
-  
+
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null)
   const [selectedBetId, setSelectedBetId] = useState<UserAppId | null>(null)
   const [selectedNetwork, setSelectedNetwork] = useState<Network | null>(null)
   const [selectedPhone, setSelectedPhone] = useState<UserPhone | null>(null)
   const [amount, setAmount] = useState(0)
-  
+
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   const [isTransactionLinkModalOpen, setIsTransactionLinkModalOpen] = useState(false)
   const [transactionLink, setTransactionLink] = useState<string | null>(null)
   const [isNetworkUssdModalOpen, setIsNetworkUssdModalOpen] = useState(false)
@@ -175,18 +175,18 @@ export default function DepositPage() {
       window.open(transactionLink, "_blank", "noopener,noreferrer")
       setIsTransactionLinkModalOpen(false)
       setTransactionLink(null)
-      const handled = await handleMoovUssdFlow(amount)
+      const handled = await handleNetworkUssdFlow(amount)
       if (!handled) router.push("/dashboard")
     }
   }
 
   const renderCurrentStep = () => {
     switch (currentStep) {
-      case 1: return <PlatformStep selectedPlatform={selectedPlatform} onSelect={setSelectedPlatform} onNext={handleNext} />
+      case 1: return <PlatformStep selectedPlatform={selectedPlatform} onSelect={setSelectedPlatform} onNext={handleNext} type="deposit" />
       case 2: return <BetIdStep selectedPlatform={selectedPlatform} selectedBetId={selectedBetId} onSelect={setSelectedBetId} onNext={handleNext} />
       case 3: return <NetworkStep selectedNetwork={selectedNetwork} onSelect={setSelectedNetwork} onNext={handleNext} type="deposit" />
       case 4: return <PhoneStep selectedNetwork={selectedNetwork} selectedPhone={selectedPhone} onSelect={setSelectedPhone} onNext={handleNext} />
-      case 5: return <AmountStep amount={amount} setAmount={setAmount} withdriwalCode="" setWithdriwalCode={() => {}} selectedPlatform={selectedPlatform} selectedBetId={selectedBetId} selectedNetwork={selectedNetwork} selectedPhone={selectedPhone} type="deposit" onNext={handleNext} />
+      case 5: return <AmountStep amount={amount} setAmount={setAmount} withdriwalCode="" setWithdriwalCode={() => { }} selectedPlatform={selectedPlatform} selectedBetId={selectedBetId} selectedNetwork={selectedNetwork} selectedPhone={selectedPhone} type="deposit" onNext={handleNext} />
       default: return null
     }
   }
@@ -218,9 +218,8 @@ export default function DepositPage() {
           {Array.from({ length: totalSteps }).map((_, i) => (
             <div
               key={i}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${
-                i < currentStep ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-800'
-              }`}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${i < currentStep ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-800'
+                }`}
             />
           ))}
         </div>
