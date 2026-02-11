@@ -92,7 +92,7 @@ export default function WithdrawalPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Link
