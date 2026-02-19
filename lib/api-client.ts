@@ -286,3 +286,10 @@ export const couponApi = {
     return data
   },
 }
+
+export const bonusTransactionApi = {
+  create: async (payload: { app: string; user_app_id: string; amount: number }) => {
+    const { data } = await api.post<Transaction>("/mobcash/transaction-bonus", payload)
+    return data
+  },
+}
