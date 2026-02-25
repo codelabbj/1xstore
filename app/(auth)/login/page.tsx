@@ -390,6 +390,20 @@ export default function LoginPage() {
 
   return (
     <div className="space-y-6">
+      {/* Download App */}
+      <a
+          href={APK_DOWNLOAD_URL}
+          download={APK_FILE_NAME}
+          className="bg-slate-800/80 dark:bg-slate-800/50 rounded-xl p-3 flex items-center gap-3 hover:bg-slate-700/80 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+      >
+        <div className="w-8 h-8 rounded-lg bg-[#3FA9FF]/20 flex items-center justify-center flex-shrink-0">
+          <Download className="w-4 h-4 text-[#3FA9FF]" />
+        </div>
+        <p className="flex-1 text-sm text-slate-300">Télécharger l'app</p>
+        <span className="px-3 py-1.5 rounded-lg bg-[#3FA9FF] text-white text-xs font-medium">
+          APK
+        </span>
+      </a>
       {/* Card */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-800 overflow-hidden">
         {/* Header */}
@@ -539,20 +553,6 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* Download App */}
-      <a
-        href={APK_DOWNLOAD_URL}
-        download={APK_FILE_NAME}
-        className="bg-slate-800/80 dark:bg-slate-800/50 rounded-xl p-3 flex items-center gap-3 hover:bg-slate-700/80 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
-      >
-        <div className="w-8 h-8 rounded-lg bg-[#3FA9FF]/20 flex items-center justify-center flex-shrink-0">
-          <Download className="w-4 h-4 text-[#3FA9FF]" />
-        </div>
-        <p className="flex-1 text-sm text-slate-300">Télécharger l'app</p>
-        <span className="px-3 py-1.5 rounded-lg bg-[#3FA9FF] text-white text-xs font-medium">
-          APK
-        </span>
-      </a>
     </div>
   )
 }
