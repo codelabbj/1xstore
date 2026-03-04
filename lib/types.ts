@@ -142,6 +142,8 @@ export interface Transaction {
   telegram_user: number | null
   app: string
   network: number
+  message?: string
+  ussd_code?: string
   app_details?: {
     id: string
     name: string

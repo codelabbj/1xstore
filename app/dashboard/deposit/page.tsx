@@ -16,6 +16,10 @@ import { toast } from "react-hot-toast"
 import { extractTimeErrorMessage } from "@/lib/utils"
 import { ChevronLeft, Copy, ArrowDownToLine, X } from "lucide-react"
 import Link from "next/link"
+// Ajoutez ces imports
+import { TransactionSummaryDialog } from "@/components/transaction/transaction-summary-dialog"
+import type { Transaction } from "@/lib/types"
+
 
 export default function DepositPage() {
   const router = useRouter()
@@ -23,6 +27,8 @@ export default function DepositPage() {
 
   const [currentStep, setCurrentStep] = useState(1)
   const totalSteps = 5
+  const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null)
+const [isTransactionSummaryOpen, setIsTransactionSummaryOpen] = useState(false)
 
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null)
   const [selectedBetId, setSelectedBetId] = useState<UserAppId | null>(null)
@@ -138,7 +144,7 @@ export default function DepositPage() {
     }
   }
 
-  const handleConfirmTransaction = async () => {
+  /* const handleConfirmTransaction = async () => {
     if (!selectedPlatform || !selectedBetId || !selectedNetwork || !selectedPhone) {
       toast.error("Données manquantes pour la transaction")
       return
@@ -168,7 +174,51 @@ export default function DepositPage() {
     } finally {
       setIsSubmitting(false)
     }
+  } */
+
+    const handleConfirmTransaction = async () => {
+  if (!selectedPlatform || !selectedBetId || !selectedNetwork || !selectedPhone) {
+    toast.error("Données manquantes pour la transaction")
+    return
   }
+  setIsSubmitting(true)
+  try {
+    const response = await transactionApi.createDeposit({
+      amount,
+      phone_number: selectedPhone.phone,
+      app: selectedPlatform.id,
+      user_app_id: selectedBetId.user_app_id,
+      network: selectedNetwork.id,
+      source: "web"
+    })
+
+    // Fermer la confirmation
+    setIsConfirmationOpen(false)
+
+    // Récupérer la dernière transaction
+    try {
+      const lastTrans = await transactionApi.getLastTransaction()
+      setLastTransaction(lastTrans)
+      setIsTransactionSummaryOpen(true)
+    } catch (error) {
+      console.error("Erreur getLastTransaction:", error)
+      
+      // Flux normal si erreur
+      if (response.transaction_link) {
+        setTransactionLink(response.transaction_link)
+        setIsTransactionLinkModalOpen(true)
+      } else {
+        const handled = await handleNetworkUssdFlow(amount)
+        if (!handled) router.push("/dashboard")
+      }
+    }
+  } catch (error: any) {
+    const timeErrorMessage = extractTimeErrorMessage(error)
+    toast.error(timeErrorMessage || "Erreur lors de la création du dépôt")
+  } finally {
+    setIsSubmitting(false)
+  }
+}
 
   const handleContinueTransaction = async () => {
     if (transactionLink) {
@@ -179,6 +229,31 @@ export default function DepositPage() {
       if (!handled) router.push("/dashboard")
     }
   }
+
+  const handleCancelTransaction = async (reference: string) => {
+  await transactionApi.cancelTransaction(reference)
+  setTimeout(() => {
+    router.push("/dashboard")
+  }, 1000)
+}
+
+const handleFinalizeTransaction = async (reference: string) => {
+  try {
+    const finalizedTransaction = await transactionApi.finalizeTransaction(reference)
+    
+    setIsTransactionSummaryOpen(false)
+    
+    if (finalizedTransaction.transaction_link) {
+      setTransactionLink(finalizedTransaction.transaction_link)
+      setIsTransactionLinkModalOpen(true)
+    } else {
+      const handled = await handleNetworkUssdFlow(amount)
+      if (!handled) router.push("/dashboard")
+    }
+  } catch (error) {
+    throw error
+  }
+}
 
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -202,7 +277,7 @@ export default function DepositPage() {
           <ChevronLeft className="w-5 h-5" />
         </Link>
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <div className="w-11 h-11 rounded-xl bg-linear-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
             <ArrowDownToLine className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -316,6 +391,16 @@ export default function DepositPage() {
           </div>
         </div>
       )}
+
+      {/* Transaction Summary Dialog */}
+      <TransactionSummaryDialog
+        isOpen={isTransactionSummaryOpen}
+        onClose={() => setIsTransactionSummaryOpen(false)}
+        transaction={lastTransaction}
+        onCancel={handleCancelTransaction}
+        onFinalize={handleFinalizeTransaction}
+        isLoading={isSubmitting}
+      />
     </div>
   )
 }
