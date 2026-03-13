@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Loader2, User, Save, Eye, EyeOff, Lock, ChevronLeft, Calendar, Gift, LogOut } from "lucide-react"
+import { Loader2, User, Save, Eye, EyeOff, Lock, ChevronLeft, Calendar, Gift, LogOut, Copy } from "lucide-react"
 import Link from "next/link"
 import { authApi } from "@/lib/api-client"
 import type { User as UserType } from "@/lib/types"
@@ -140,9 +140,21 @@ export default function ProfilePage() {
           </div>
         </div>
         {profile?.referral_code && (
-          <div className="mt-4 p-3 bg-white/10 rounded-xl">
-            <p className="text-xs text-white/70 mb-1">Code de parrainage</p>
-            <p className="font-mono font-bold">{profile.referral_code}</p>
+          <div className="mt-4 p-3 bg-white/10 rounded-xl flex items-center justify-between">
+            <div>
+              <p className="text-xs text-white/70 mb-1">Code de parrainage</p>
+              <p className="font-mono font-bold">{profile.referral_code}</p>
+            </div>
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(profile.referral_code)
+                toast.success("Code de parrainage copié!")
+              }}
+              className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+              title="Copier le code"
+            >
+              <Copy className="w-5 h-5" />
+            </button>
           </div>
         )}
       </div>

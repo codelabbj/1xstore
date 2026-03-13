@@ -20,7 +20,7 @@ const baseSignupSchema = z.object({
 })
 
 type SignupFormData = z.infer<typeof baseSignupSchema> & {
-  referral_code?: string
+  referrer_code?: string
 }
 
 export default function SignupPage() {
@@ -49,7 +49,7 @@ export default function SignupPage() {
   const signupSchema = referralBonusEnabled
     ? baseSignupSchema
       .extend({
-        referral_code: z.string().optional(),
+        referrer_code: z.string().optional(),
       })
       .refine((data) => data.password === data.re_password, {
         message: "Les mots de passe ne correspondent pas",
@@ -89,8 +89,8 @@ export default function SignupPage() {
         re_password: data.re_password,
       }
 
-      if (referralBonusEnabled && data.referral_code) {
-        registrationData.referral_code = data.referral_code
+      if (referralBonusEnabled && data.referrer_code) {
+        registrationData.referrer_code = data.referrer_code
       }
 
       await authApi.register(registrationData)
@@ -330,7 +330,7 @@ export default function SignupPage() {
                 <input
                   type="text"
                   placeholder="Entrez le code de parrainage"
-                  {...register("referral_code")}
+                  {...register("referrer_code")}
                   disabled={isLoading}
                   className="w-full h-12 sm:h-14 pl-12 pr-4 rounded-xl sm:rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#3FA9FF] focus:border-solid focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-[#3FA9FF]/10 outline-none transition-all duration-200 text-sm sm:text-base"
                 />
