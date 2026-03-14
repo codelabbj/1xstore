@@ -248,7 +248,7 @@ export default function DashboardPage() {
                 Dépôt requis
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
-                Vous devez effectuer un dépôt réussi pour accéder aux coupons.
+                Vous devez effectuer au moins un dépôt avant de pouvoir consulter la liste des coupons
               </p>
               <Link
                 href="/dashboard/deposit"
@@ -416,8 +416,8 @@ export default function DashboardPage() {
         <button
           onClick={() => setIsChatOpen(!isChatOpen)}
           className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all ${isChatOpen
-              ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-              : 'bg-[#3FA9FF] text-white shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-105'
+            ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+            : 'bg-[#3FA9FF] text-white shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-105'
             }`}
         >
           {isChatOpen ? (
