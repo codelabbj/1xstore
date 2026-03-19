@@ -1,33 +1,90 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Loader2, Ticket, Copy, Check, ChevronLeft } from "lucide-react"
 import Link from "next/link"
-import { couponApi, platformApi } from "@/lib/api-client"
+import { couponApi, platformApi, settingsApi, transactionApi } from "@/lib/api-client"
 import type { Coupon, Platform } from "@/lib/types"
 import { toast } from "react-hot-toast"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 
 export default function CouponPage() {
+  const router = useRouter()
   const { user } = useAuth()
+
+  // ── Settings gate ──
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true)
+  const [couponAccessEnabled, setCouponAccessEnabled] = useState(false)
+
+  // ── Page data ──
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [platforms, setPlatforms] = useState<Platform[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
 
+  // ────────────────────────────────────────────
+  // Initial load: check settings gate
+  // ────────────────────────────────────────────
   useEffect(() => {
-    fetchCoupons()
-    fetchPlatforms()
-  }, [])
+    if (!user) return
+    const init = async () => {
+      try {
+        const settings = await settingsApi.get()
 
+        const requiresDeposit = settings?.requires_deposit_to_view_coupon === true
+        const minimumRequired: number = settings?.minimun_deposit_before_view_coupon ?? 0
+
+        if (!requiresDeposit) {
+          // Flag is OFF → free access, skip transaction check
+          setCouponAccessEnabled(true)
+          await Promise.all([fetchCoupons(), fetchPlatforms()])
+          return
+        }
+
+        // Flag is ON → user must have at least one accepted deposit >= minimumRequired
+        const history = await transactionApi.getHistory({
+          type_trans: "deposit",
+          status: "accept",
+          page_size: 100,
+        })
+
+        const hasQualifying = history.results.some(
+          (tx) => tx.amount >= minimumRequired
+        )
+
+        if (!hasQualifying) {
+          toast.error(
+            `Effectuez un dépôt d'au moins ${minimumRequired.toLocaleString()} FCFA pour accéder aux coupons`
+          )
+          router.push("/dashboard")
+          return
+        }
+
+        setCouponAccessEnabled(true)
+        await Promise.all([fetchCoupons(), fetchPlatforms()])
+      } catch {
+        router.push("/dashboard")
+      } finally {
+        setIsLoadingSettings(false)
+      }
+    }
+    init()
+  }, [user, router])
+
+  // Reload on window focus
   useEffect(() => {
+    if (!couponAccessEnabled) return
     const handleFocus = () => fetchCoupons()
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [])
+    window.addEventListener("focus", handleFocus)
+    return () => window.removeEventListener("focus", handleFocus)
+  }, [couponAccessEnabled])
 
+  // ────────────────────────────────────────────
+  // Data fetching
+  // ────────────────────────────────────────────
   const fetchPlatforms = async () => {
     try {
       const data = await platformApi.getAll()
@@ -61,13 +118,18 @@ export default function CouponPage() {
     setTimeout(() => setCopiedCode(null), 2000)
   }
 
-  if (!user) {
+  // ────────────────────────────────────────────
+  // Loading / gate states
+  // ────────────────────────────────────────────
+  if (isLoadingSettings) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-slate-500">Veuillez vous connecter</p>
+        <Loader2 className="w-8 h-8 text-[#3FA9FF] animate-spin" />
       </div>
     )
   }
+
+  if (!couponAccessEnabled) return null
 
   return (
     <div className="max-w-2xl mx-auto">

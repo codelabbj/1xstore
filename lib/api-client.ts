@@ -38,15 +38,15 @@ export const authApi = {
     phone: string
     password: string
     re_password: string
-    referral_code?: string
+    referrer_code?: string
   }) => {
     const payload: any = {
       ...userData,
       phone: formatPhoneNumber(userData.phone),
     }
-    // Only include referral_code if it's provided
-    if (userData.referral_code) {
-      payload.referral_code = userData.referral_code
+    // Only include referrer_code if it's provided
+    if (userData.referrer_code) {
+      payload.referrer_code = userData.referrer_code
     }
     const { data } = await api.post("/auth/registration", payload)
     return data

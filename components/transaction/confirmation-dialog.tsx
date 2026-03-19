@@ -110,6 +110,13 @@ export function ConfirmationDialog({
               <span className="text-sm text-muted-foreground">Plateforme</span>
               <span className="font-medium">{platformName}</span>
             </div>
+
+            {type === "withdrawal" && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Moyen de retrait</span>
+                <span className="font-medium">1xespece</span>
+              </div>
+            )}
             
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">ID de pari</span>

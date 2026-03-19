@@ -126,6 +126,13 @@ export function AmountStep({
               <span className="font-medium text-xs sm:text-sm text-right break-words text-foreground">{selectedPlatform.name}</span>
             </div>
             
+            {!isDeposit && (
+              <div className="flex justify-between items-center gap-3 py-1.5">
+                <span className="text-xs sm:text-sm text-muted-foreground">Moyen de retrait</span>
+                <span className="font-medium text-xs sm:text-sm text-right break-words text-foreground">1xespece</span>
+              </div>
+            )}
+            
             {selectedPlatform.city && (
               <div className="flex justify-between items-center gap-3 py-1.5">
                 <span className="text-xs sm:text-sm text-muted-foreground">Ville</span>
