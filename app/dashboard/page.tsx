@@ -14,7 +14,6 @@ import { fr } from "date-fns/locale"
 import { formatPhoneNumberForDisplay } from "@/lib/utils"
 
 export default function DashboardPage() {
-  
   const { user } = useAuth()
   const router = useRouter()
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
@@ -121,31 +120,14 @@ export default function DashboardPage() {
   const handleCouponClick = async () => {
     setIsCheckingDeposit(true)
     try {
-      const settings = await settingsApi.get()
-      const requiresDeposit = settings?.requires_deposit_to_view_coupon === true
-      const minimumRequired: number = settings?.minimun_deposit_before_view_coupon ?? 0
-
-      if (!requiresDeposit) {
-        // Flag is OFF → no check needed, go straight to coupons
-        router.push("/dashboard/coupon")
-        return
-      }
-
-      // Flag is ON → ensure user has at least one accepted deposit >= minimum
-      const data = await transactionApi.getHistory({
-        type_trans: "deposit",
-        status: "accept",
-        page_size: 100,
-      })
-      const hasQualifying = data.results.some((tx) => tx.amount >= minimumRequired)
-
-      if (hasQualifying) {
+      const data = await transactionApi.getHistory({ type_trans: "deposit", status: "accept", page_size: 1 })
+      if (data.results && data.results.length > 0) {
         router.push("/dashboard/coupon")
       } else {
         setShowDepositGate(true)
       }
     } catch (error) {
-      // On error, allow access (fail-open)
+      // On error, allow access (fail-open) or show message
       router.push("/dashboard/coupon")
     } finally {
       setIsCheckingDeposit(false)
@@ -276,7 +258,7 @@ export default function DashboardPage() {
                 Dépôt requis
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
-                Vous devez effectuer au moins un dépôt avant de pouvoir consulter la liste des coupons
+                Vous devez effectuer un dépôt réussi pour accéder aux coupons.
               </p>
               <Link
                 href="/dashboard/deposit"
@@ -444,8 +426,8 @@ export default function DashboardPage() {
         <button
           onClick={() => setIsChatOpen(!isChatOpen)}
           className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all ${isChatOpen
-            ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-            : 'bg-[#3FA9FF] text-white shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-105'
+              ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              : 'bg-[#3FA9FF] text-white shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-105'
             }`}
         >
           {isChatOpen ? (
