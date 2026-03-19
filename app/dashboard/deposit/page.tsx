@@ -250,7 +250,7 @@ export default function DepositPage() {
   // ── Spinner pendant le check initial ─────────────────────────────────────
   if (!isPendingCheckDone) {
     return (
-      <div className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto flex items-center justify-center min-h-[400px]">
+      <div className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto flex items-center justify-center min-h-100">
         <div className="flex flex-col items-center gap-3 text-slate-500">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#3FA9FF] border-t-transparent" />
           <p className="text-sm">Vérification en cours...</p>

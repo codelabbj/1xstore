@@ -179,7 +179,7 @@ export function TransactionSummaryDialog({
           </div>
 
           {/* Amount */}
-          <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800">
+          <div className="p-4 bg-linear-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800">
             <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">Montant</p>
             <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
               {transaction.amount.toLocaleString("fr-FR", {
