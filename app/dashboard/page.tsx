@@ -14,6 +14,7 @@ import { fr } from "date-fns/locale"
 import { formatPhoneNumberForDisplay } from "@/lib/utils"
 
 export default function DashboardPage() {
+  
   const { user } = useAuth()
   const router = useRouter()
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
@@ -37,6 +38,14 @@ export default function DashboardPage() {
     window.addEventListener("popstate", handlePopState)
     return () => window.removeEventListener("popstate", handlePopState)
   }, [])
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user) fetchRecentTransactions()
+    }
+    window.addEventListener("focus", handleFocus)
+    return () => window.removeEventListener("focus", handleFocus)
+  }, [user])
 
   const fetchRecentTransactions = async () => {
     try {
@@ -128,12 +137,14 @@ export default function DashboardPage() {
 
   const getStatusConfig = (status: Transaction["status"]) => {
     const configs: Record<string, { icon: any; color: string; bg: string; label: string }> = {
-      pending: { icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", label: "En attente" },
-      accept: { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Accepté" },
-      init_payment: { icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", label: "En attente" },
-      error: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", label: "Erreur" },
-      reject: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", label: "Rejeté" },
-      timeout: { icon: AlertCircle, color: "text-slate-500", bg: "bg-slate-500/10", label: "Expiré" },
+      pending:      { icon: Clock,        color: "text-amber-500",  bg: "bg-amber-500/10",  label: "En attente" },
+      accept:       { icon: CheckCircle2, color: "text-emerald-500",bg: "bg-emerald-500/10",label: "Accepté" },
+      init_payment: { icon: Clock,        color: "text-amber-500",  bg: "bg-amber-500/10",  label: "En attente" },
+      error:        { icon: XCircle,      color: "text-red-500",    bg: "bg-red-500/10",    label: "Erreur" },
+      reject:       { icon: XCircle,      color: "text-red-500",    bg: "bg-red-500/10",    label: "Rejeté" },
+      timeout:      { icon: AlertCircle,  color: "text-slate-500",  bg: "bg-slate-500/10",  label: "Expiré" },
+      cancel:       { icon: XCircle,      color: "text-slate-500",  bg: "bg-slate-500/10",  label: "Annulé" },  // ✅ ajout
+      annuler:      { icon: XCircle,      color: "text-slate-500",  bg: "bg-slate-500/10",  label: "Annulé" },  // ✅ ajout
     }
     return configs[status] || configs.timeout
   }
